@@ -3,6 +3,12 @@ const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const rateLimit = require("express-rate-limit");
+const { HttpError, rateLimitHandler } = require("./src/utils/http");
+const authRoutes = require("./src/routes/auth.routes");
+const profileRoutes = require("./src/routes/profile.routes");
+const verificationRoutes = require("./src/routes/verification.routes");
+const adminVerificationRoutes = require("./src/routes/admin-verification.routes");
+const safetyRoutes = require("./src/routes/safety.routes");
 
 const app = express();
 
@@ -10,20 +16,21 @@ app.use(helmet());
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
-    credentials: true
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    credentials: true,
   })
 );
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  limit: 200,
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  handler: rateLimitHandler,
 });
 
 app.use("/api", apiLimiter);
@@ -36,6 +43,50 @@ app.get("/api/v1/health", (req, res) => {
       environment: process.env.NODE_ENV,
       timestamp: new Date().toISOString()
     }
+  });
+});
+
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/users", profileRoutes);
+app.use("/api/v1/verifications", verificationRoutes);
+app.use("/api/v1/admin/verifications", adminVerificationRoutes);
+app.use("/api/v1/safety", safetyRoutes);
+
+app.use((req, _res, next) => {
+  next(new HttpError(404, "Route was not found", "NOT_FOUND"));
+});
+
+app.use((error, _req, res, _next) => {
+  if (res.headersSent) return;
+  const statusCode =
+    error.statusCode ||
+    (["JsonWebTokenError", "TokenExpiredError", "NotBeforeError"].includes(error.name)
+      ? 401
+      : error.name === "MulterError"
+        ? error.code === "LIMIT_FILE_SIZE"
+          ? 413
+          : 400
+        : error.name === "CastError"
+          ? 400
+          : error.code === 11000
+            ? 409
+            : 500);
+  const code =
+    error.code && typeof error.code === "string"
+      ? error.code
+      : error.name === "CastError"
+        ? "INVALID_ID"
+        : error.code === 11000
+          ? "DUPLICATE_RESOURCE"
+          : "INTERNAL_ERROR";
+  const message =
+    statusCode >= 500 ? "An unexpected server error occurred" : error.message;
+  if (statusCode >= 500 && !(error instanceof HttpError)) {
+    console.error("API request failed:", { name: error.name, code });
+  }
+  res.status(statusCode).json({
+    success: false,
+    error: { code, message },
   });
 });
 

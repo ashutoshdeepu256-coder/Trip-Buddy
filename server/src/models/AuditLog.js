@@ -1,0 +1,35 @@
+const mongoose = require("mongoose");
+
+const auditLogSchema = new mongoose.Schema(
+  {
+    actor: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    action: {
+      type: String,
+      enum: [
+        "EMAIL_VERIFIED",
+        "PHONE_VERIFIED",
+        "IDENTITY_SUBMITTED",
+        "IDENTITY_APPROVED",
+        "IDENTITY_REJECTED",
+        "IDENTITY_REVOKED",
+        "USER_BLOCKED",
+        "USER_UNBLOCKED",
+        "USER_REPORTED",
+        "ADMIN_ACTION",
+      ],
+      required: true,
+    },
+    resourceType: { type: String, required: true, maxlength: 80 },
+    resourceId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    metadata: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
+    ip: { type: String, maxlength: 64, default: null },
+    userAgent: { type: String, maxlength: 500, default: null },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } },
+);
+
+auditLogSchema.index({ actor: 1, createdAt: -1 });
+auditLogSchema.index({ resourceType: 1, resourceId: 1 });
+auditLogSchema.index({ action: 1, createdAt: -1 });
+
+module.exports = mongoose.models.AuditLog || mongoose.model("AuditLog", auditLogSchema);

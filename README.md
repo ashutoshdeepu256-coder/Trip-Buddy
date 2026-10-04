@@ -1,0 +1,37 @@
+# TripBuddy
+
+TripBuddy is a travel companion app. The repository currently includes a
+responsive React client and an Express/MongoDB API with account, profile,
+verification, and safety foundations.
+
+## Run locally
+
+1. Install dependencies with `npm install`.
+2. Copy `server/.env.example` to `server/.env` and replace the required secrets
+   with unique random values. Never commit that file.
+3. Start MongoDB and set `MONGODB_URI`.
+4. For local verification flows only, set `ALLOW_DEV_VERIFICATION_CODES=true`.
+   This returns codes/tokens only from non-production server responses; it does
+   not send email or SMS. Disable it outside local development.
+5. Run `npm run dev` from the repository root. The API is on port 5000 and the
+   Vite client is on port 5173 by default.
+
+Optional provider configuration and API details are documented in
+[verification API docs](./docs/api/verifications.md) and
+[safety API docs](./docs/api/safety.md).
+
+## Validation
+
+- `npm test` — backend API/security tests; MongoDB-backed scenarios are skipped
+  unless `MONGODB_TEST_URI` is set to a disposable test database (the suite
+  drops that database afterward)
+- `npm run lint --workspace=server` — server lint
+- `npm run lint --workspace=client` — client lint
+- `npm run build --workspace=client` — client production build
+
+## Security notes
+
+User roles are not selectable during signup. Assign moderator/admin roles only
+through trusted database operations. Use HTTPS in production, keep webhook and
+storage credentials in environment secrets, configure only trusted origins in
+`CLIENT_URL`, and do not enable development verification codes in production.
