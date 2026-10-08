@@ -22,6 +22,9 @@ accepted in create/update payloads.
 
 My trips response includes `items`, `page`, `limit`, `total`, `totalPages`,
 `hasNextPage`, and `hasPreviousPage`. Page size is capped at 50.
+The API is globally limited to 200 requests per IP per 15 minutes; draft
+creation is additionally limited to 20 requests per hour and image upload to
+10 requests per hour.
 
 ## Data and lifecycle
 

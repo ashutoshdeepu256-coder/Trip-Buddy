@@ -24,6 +24,13 @@ const createLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitHandler,
 });
+const imageUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+});
 const imageUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_SIZE, files: 8 },
@@ -61,6 +68,7 @@ trips.post(
 trips.post(
   "/:tripId/images",
   requireAuth,
+  imageUploadLimiter,
   validate(tripIdParamSchema, "params"),
   imageUpload.array("images", 8),
   asyncHandler(controller.uploadImages),

@@ -12,6 +12,29 @@ const tripImageSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const tripLocationSchema = new mongoose.Schema(
+  {
+    type: { type: String, enum: ["Point"], required: true },
+    coordinates: {
+      type: [Number],
+      required: true,
+      validate: {
+        validator(value) {
+          return value.length === 2 &&
+            Number.isFinite(value[0]) &&
+            value[0] >= -180 &&
+            value[0] <= 180 &&
+            Number.isFinite(value[1]) &&
+            value[1] >= -90 &&
+            value[1] <= 90;
+        },
+        message: "Trip coordinates must be [longitude, latitude]",
+      },
+    },
+  },
+  { _id: false },
+);
+
 const tripSchema = new mongoose.Schema(
   {
     creator: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
@@ -47,30 +70,7 @@ const tripSchema = new mongoose.Schema(
       index: true,
     },
     images: { type: [tripImageSchema], default: [] },
-    location: {
-      type: {
-        type: String,
-        enum: ["Point"],
-        default: "Point",
-      },
-      coordinates: {
-        type: [Number],
-        default: undefined,
-        validate: {
-          validator(value) {
-            return value === undefined ||
-              (value.length === 2 &&
-                Number.isFinite(value[0]) &&
-                value[0] >= -180 &&
-                value[0] <= 180 &&
-                Number.isFinite(value[1]) &&
-                value[1] >= -90 &&
-                value[1] <= 90);
-          },
-          message: "Trip coordinates must be [longitude, latitude]",
-        },
-      },
-    },
+    location: { type: tripLocationSchema, default: undefined },
     publishedAt: { type: Date, default: null },
     cancelledAt: { type: Date, default: null },
     completedAt: { type: Date, default: null },

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTripStore } from '../../store/tripStore'
-import tripService from '../../services/tripService'
 import '../TripPages.css'
 
 const filters = [

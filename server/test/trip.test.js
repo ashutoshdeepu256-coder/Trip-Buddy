@@ -9,7 +9,6 @@ const tripImages = require("../src/services/trip-image.service");
 const {
   createTripSchema,
   updateTripSchema,
-  updateTripSchema,
   publishTripSchema,
   statusChangeSchema,
   listMyTripsQuerySchema,
@@ -39,7 +38,7 @@ const validTripInput = () => {
   };
 };
 
-test("trip model links users and destinations and indexes discovery/matching queries", () => {
+test("trip model links users and destinations and indexes discovery/matching queries", async () => {
   assert.equal(Trip.schema.path("creator").options.ref, "User");
   assert.equal(Trip.schema.path("destination").options.ref, "Destination");
   const indexes = Trip.schema.indexes().map(([fields]) => fields);
@@ -48,6 +47,14 @@ test("trip model links users and destinations and indexes discovery/matching que
   assert.ok(indexes.some((fields) => fields.status === 1 && fields.privacy === 1 && fields.startDate === 1));
   assert.ok(indexes.some((fields) => fields.location === "2dsphere"));
   assert.ok(TripMember.schema.indexes().some(([fields, options]) => fields.trip === 1 && fields.user === 1 && options.unique));
+  const draft = new Trip({ creator: ownerId });
+  assert.equal(draft.location, undefined);
+  await assert.doesNotReject(draft.validate());
+  const invalidLocation = new Trip({
+    creator: ownerId,
+    location: { type: "Point", coordinates: [181, 91] },
+  });
+  await assert.rejects(invalidLocation.validate(), { name: "ValidationError" });
 });
 
 test("draft validation permits incomplete fields but strips client-controlled lifecycle status", () => {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import destinationService from '../../services/destinationService'
 import '../TripPages.css'
 
@@ -77,24 +77,15 @@ function TripForm({ trip, submitting, error, onSave, onRemoveImage }) {
   const {
     register,
     handleSubmit,
+    control,
     setValue,
     setError,
-    watch,
     formState: { errors, isDirty },
   } = useForm({ resolver: zodResolver(schema), defaultValues: defaults })
 
   useEffect(() => {
-    if (!trip?.destination) return
-    setDestinationSearch(trip.destination.name || '')
-    setValue('destination', trip.destination.id || trip.destination, { shouldDirty: false })
-  }, [trip, setValue])
-
-  useEffect(() => {
     const search = destinationSearch.trim()
-    if (!search) {
-      setDestinationOptions([])
-      return undefined
-    }
+    if (!search) return undefined
     let active = true
     const timer = window.setTimeout(() => {
       setDestinationLoading(true)
@@ -177,7 +168,7 @@ function TripForm({ trip, submitting, error, onSave, onRemoveImage }) {
     setFormMessage('')
   }
 
-  const fields = watch()
+  const fields = useWatch({ control })
 
   return (
     <form className="trip-form" onSubmit={submit} noValidate>
@@ -187,6 +178,8 @@ function TripForm({ trip, submitting, error, onSave, onRemoveImage }) {
           <span>Find a destination</span>
           <input value={destinationSearch} onChange={(event) => {
             setDestinationSearch(event.target.value)
+            setDestinationOptions([])
+            if (!event.target.value.trim()) setDestinationLoading(false)
             setValue('destination', '', { shouldDirty: true })
           }} placeholder="Search city or country" autoComplete="off" />
           <input type="hidden" {...register('destination')} />
