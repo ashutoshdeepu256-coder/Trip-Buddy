@@ -38,13 +38,13 @@ function TripDetails() {
   }
 
   if (loading) return <main className="page-loading" role="status">Loading trip…</main>
-  if (!trip) return <main className="trip-shell"><p className="form-error" role="alert">{error || 'Trip could not be found or you do not have permission to view it.'}</p><Link to="/trips">Back to my trips</Link></main>
+  if (!trip) return <main className="trip-shell"><p className="form-error" role="alert">{error || 'Trip could not be found or you do not have permission to view it.'}</p><Link to="/my-trips">Back to my trips</Link></main>
 
   return (
     <main className="trip-shell">
-      <header className="trip-page-header"><Link to="/" className="destination-brand">TripBuddy</Link><nav><Link to="/trips">My trips</Link><Link to="/destinations">Destinations</Link></nav></header>
+      <header className="trip-page-header"><Link to="/" className="destination-brand">TripBuddy</Link><nav><Link to="/my-trips">My trips</Link><Link to="/trips">Discover trips</Link><Link to="/destinations">Destinations</Link></nav></header>
       <div className="trip-detail-heading">
-        <div><Link className="trip-back" to="/trips">← My trips</Link><span className={`trip-status status-${trip.status.toLowerCase()}`}>{pretty(trip.status)}</span><h1>{trip.title || 'Untitled trip draft'}</h1><p>{trip.destination?.name ? `${trip.destination.name}${trip.destination.country ? `, ${trip.destination.country}` : ''}` : 'Choose a destination'}</p></div>
+        <div><Link className="trip-back" to={owner ? '/my-trips' : '/trips'}>← {owner ? 'My trips' : 'Discover trips'}</Link><span className={`trip-status status-${trip.status.toLowerCase()}`}>{pretty(trip.status)}</span><h1>{trip.title || 'Untitled trip draft'}</h1><p>{trip.destination?.name ? `${trip.destination.name}${trip.destination.country ? `, ${trip.destination.country}` : ''}` : 'Choose a destination'}</p></div>
         {owner && <div className="trip-detail-actions">
           {trip.status === 'DRAFT' && <Link className="secondary-btn" to={`/trips/${trip.id}/edit`}>Edit draft</Link>}
           {trip.status === 'DRAFT' && <button className="primary-btn" type="button" disabled={saving} onClick={() => action(publishTrip)}>Publish trip</button>}
@@ -53,7 +53,7 @@ function TripDetails() {
             if (window.confirm('Cancel this trip? This cannot be undone.')) void action(cancelTrip)
           }}>Cancel</button>}
           {trip.status === 'DRAFT' && <button className="trip-danger-button" type="button" disabled={saving} onClick={() => {
-            if (window.confirm('Delete this draft permanently?')) void deleteTrip(trip.id).then(() => navigate('/trips')).catch(() => {})
+            if (window.confirm('Delete this draft permanently?')) void deleteTrip(trip.id).then(() => navigate('/my-trips')).catch(() => {})
           }}>Delete draft</button>}
         </div>}
       </div>

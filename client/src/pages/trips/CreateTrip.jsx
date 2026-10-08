@@ -29,7 +29,7 @@ function CreateTrip() {
 
   return (
     <main className="trip-shell">
-      <header className="trip-page-header"><Link to="/" className="destination-brand">TripBuddy</Link><nav><Link to="/trips">My trips</Link><Link to="/destinations">Destinations</Link></nav></header>
+      <header className="trip-page-header"><Link to="/" className="destination-brand">TripBuddy</Link><nav><Link to="/my-trips">My trips</Link><Link to="/trips">Discover trips</Link></nav></header>
       <section className="trip-page-intro"><span className="eyebrow">Make a plan, find your people</span><h1>Create a trip</h1><p>Start with a draft. You can fill in details over time and publish when it’s ready.</p></section>
       {uploadError && <p className="form-error" role="alert">{uploadError} <Link to={`/trips/${savedTripId}/edit`}>Open the saved draft</Link></p>}
       <TripForm submitting={saving} error={error} onSave={save} />

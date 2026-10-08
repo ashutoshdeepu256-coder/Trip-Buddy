@@ -14,6 +14,7 @@ import CreateTrip from './pages/trips/CreateTrip'
 import EditTrip from './pages/trips/EditTrip'
 import TripDetails from './pages/trips/TripDetails'
 import MyTrips from './pages/trips/MyTrips'
+import DiscoverTrips from './pages/trips/DiscoverTrips'
 
 const facts = [
   { label: 'Travel style', value: 'Your pace' },
@@ -70,7 +71,8 @@ function App() {
 
         {user ? (
           <div className="topbar-actions">
-            <Link to="/trips">My trips</Link>
+            <Link to="/trips">Discover trips</Link>
+            <Link to="/my-trips">My trips</Link>
             <Link to="/profile" className="text-link">My profile</Link>
             <button type="button" className="secondary-btn nav-action" onClick={logout}>
               Sign out
@@ -187,7 +189,8 @@ function App() {
       <Route path="/verify-email" element={<EmailVerificationPage />} />
       <Route path="/destinations" element={<DestinationDiscovery />} />
       <Route path="/destinations/:id" element={<DestinationPage />} />
-      <Route path="/trips" element={<ProtectedRoute><MyTrips /></ProtectedRoute>} />
+      <Route path="/trips" element={<DiscoverTrips />} />
+      <Route path="/my-trips" element={<ProtectedRoute><MyTrips /></ProtectedRoute>} />
       <Route path="/trips/create" element={<ProtectedRoute><CreateTrip /></ProtectedRoute>} />
       <Route path="/trips/:tripId/edit" element={<ProtectedRoute><EditTrip /></ProtectedRoute>} />
       <Route path="/trips/:tripId" element={<TripDetails />} />

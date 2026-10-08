@@ -104,7 +104,8 @@ function ProfilePage({ edit = false, travelPreferences = false }) {
         <p className="profile-bio">{currentProfile.bio || 'Add a few details about yourself to help find compatible travel companions.'}</p>
         <div className="profile-actions">
           <Link className="primary-btn" to="/trips/create">Create trip</Link>
-          <Link className="secondary-btn" to="/trips">My trips</Link>
+          <Link className="secondary-btn" to="/my-trips">My trips</Link>
+          <Link className="secondary-btn" to="/trips">Discover trips</Link>
           <span className="secondary-btn" aria-disabled="true" title="Trip discovery is planned for Phase 9">Discover trips · coming soon</span>
           <Link className="secondary-btn" to="/profile/edit">Edit profile</Link>
           <Link className="secondary-btn" to="/profile/travel-preferences">Travel preferences</Link>

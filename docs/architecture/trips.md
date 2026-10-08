@@ -5,6 +5,7 @@
 `Trip` is the planning entity and references `User` and `Destination` by
 ObjectId. It stores trip-specific dates, budget, group size, preferences,
 privacy, status, images, optional GeoJSON location, and lifecycle timestamps.
+Trip languages are stored as a normalized bounded list for discovery matching.
 Destination facts remain in the existing Destination collection. `TripMember`
 is the membership edge (`trip`, `user`, `role`, `status`, `joinedAt`,
 `invitedBy`) for future join/invitation functionality; the creator is

@@ -37,7 +37,7 @@ function MyTrips() {
 
   return (
     <main className="trip-shell">
-      <header className="trip-page-header"><Link to="/" className="destination-brand">TripBuddy</Link><nav><Link to="/destinations">Destinations</Link><Link to="/profile">Profile</Link></nav></header>
+      <header className="trip-page-header"><Link to="/" className="destination-brand">TripBuddy</Link><nav><Link to="/trips">Discover trips</Link><Link to="/destinations">Destinations</Link><Link to="/profile">Profile</Link></nav></header>
       <section className="trip-page-intro trip-list-heading"><div><span className="eyebrow">Your journeys</span><h1>My trips</h1><p>Keep drafts, published plans, and past journeys in one place.</p></div><Link className="primary-btn" to="/trips/create">Create trip</Link></section>
       <div className="trip-filter-tabs" aria-label="Filter trips">
         {filters.map(([value, label]) => <button type="button" key={value} className={filter === value ? 'active' : ''} onClick={() => chooseFilter(value)}>{label}</button>)}

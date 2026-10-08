@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { URLSearchParams } = require("node:url");
 
 if (!process.env.MONGODB_TEST_URI) {
   test("MongoDB-backed workflows", { skip: "Set MONGODB_TEST_URI to an isolated disposable test database" }, () => {});
@@ -572,6 +573,102 @@ if (!process.env.MONGODB_TEST_URI) {
 
       const inviteOnlyTripId = await createAndPublish("INVITE_ONLY", "Invite-only coastal trip");
       assert.equal((await request("GET", `/api/v1/trips/${inviteOnlyTripId}`, { cookie: other.cookie })).response.status, 404);
+    });
+
+    await context.test("trip discovery uses published MongoDB records, filters overlap, and excludes private or full trips", async () => {
+      const destination = await Destination.findOne({ slug: "coastal-example" });
+      const startDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+      startDate.setUTCHours(0, 0, 0, 0);
+      const endDate = new Date(startDate.getTime() + 5 * 24 * 60 * 60 * 1000);
+      const createTrip = async (privacy, title, shouldPublish = true) => {
+        const created = await request("POST", "/api/v1/trips", {
+          cookie: owner.cookie,
+          body: {
+            destination: destination._id.toString(),
+            title,
+            description: "An upcoming coastal trip with walks, local food, and enough details.",
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            budget: { min: 10000, max: 18000, currency: "INR" },
+            groupSize: { min: 1, max: 4 },
+            travelStyle: ["Adventure"],
+            interests: ["Trekking", "Food"],
+            activities: ["Hiking"],
+            accommodationPreference: ["Hostel"],
+            transportPreference: ["Train"],
+            foodPreference: ["Vegan"],
+            languages: ["Hindi"],
+            privacy,
+          },
+        });
+        assert.equal(created.response.status, 201);
+        if (shouldPublish) {
+          const published = await request("POST", `/api/v1/trips/${created.payload.data.id}/publish`, {
+            cookie: owner.cookie,
+            body: {},
+          });
+          assert.equal(published.response.status, 200);
+        }
+        return created.payload.data.id;
+      };
+
+      const publicId = await createTrip("PUBLIC", "Published discovery candidate");
+      const communityId = await createTrip("COMMUNITY", "Community discovery candidate");
+      const privateId = await createTrip("PRIVATE", "Private discovery candidate");
+      const inviteId = await createTrip("INVITE_ONLY", "Invite-only discovery candidate");
+      const draftId = await createTrip("PUBLIC", "Draft discovery candidate", false);
+      const cancelledId = await createTrip("PUBLIC", "Cancelled discovery candidate");
+      await request("POST", `/api/v1/trips/${cancelledId}/cancel`, { cookie: owner.cookie, body: {} });
+      const fullId = await createTrip("PUBLIC", "Full discovery candidate");
+      await TripMember.create([
+        { trip: fullId, user: new mongoose.Types.ObjectId(), role: "MEMBER", status: "ACTIVE", joinedAt: new Date() },
+        { trip: fullId, user: new mongoose.Types.ObjectId(), role: "MEMBER", status: "ACTIVE", joinedAt: new Date() },
+        { trip: fullId, user: new mongoose.Types.ObjectId(), role: "MEMBER", status: "ACTIVE", joinedAt: new Date() },
+      ]);
+
+      const query = new URLSearchParams({
+        destination: "Coastal Example",
+        startDate: new Date(startDate.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+        endDate: new Date(endDate.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+        dateFlexibility: "1",
+        budgetMin: "12000",
+        budgetMax: "15000",
+        budgetCurrency: "INR",
+        groupSize: "2",
+        travelStyle: "adventure",
+        interests: "trekking",
+        activities: "hiking",
+        accommodation: "hostel",
+        transport: "train",
+        foodPreference: "vegan",
+        language: "hindi",
+        sort: "date",
+      });
+      const discovery = await request("GET", `/api/v1/trips?${query}`);
+      assert.equal(discovery.response.status, 200);
+      assert.deepEqual(discovery.payload.data.items.map((trip) => trip.id), [publicId]);
+      assert.equal(discovery.payload.data.items[0].currentMembers, 1);
+      assert.equal(discovery.payload.data.items[0].availableSlots, 3);
+      assert.equal(discovery.payload.data.items[0].creator.email, undefined);
+      assert.equal(discovery.payload.data.items[0].creator.dateOfBirth, undefined);
+
+      const signedInDiscovery = await request("GET", `/api/v1/trips?${query}`, { cookie: other.cookie });
+      assert.deepEqual(
+        signedInDiscovery.payload.data.items.map((trip) => trip.id).sort(),
+        [publicId, communityId].sort(),
+      );
+      const wrongCurrency = await request(
+        "GET",
+        `/api/v1/trips?${new URLSearchParams({ startDate: startDate.toISOString(), endDate: endDate.toISOString(), budgetMin: "10000", budgetCurrency: "USD" })}`,
+      );
+      assert.equal(wrongCurrency.response.status, 200);
+      assert.equal(wrongCurrency.payload.data.items.some((trip) => trip.id === publicId), false);
+      const verifiedOnly = await request("GET", `/api/v1/trips?${new URLSearchParams({ startDate: startDate.toISOString(), endDate: endDate.toISOString(), verifiedOnly: "true" })}`);
+      assert.equal(verifiedOnly.response.status, 200);
+      assert.equal(verifiedOnly.payload.data.items.some((trip) => trip.id === publicId), false);
+      for (const excludedId of [privateId, inviteId, draftId, cancelledId, fullId]) {
+        assert.equal(discovery.payload.data.items.some((trip) => trip.id === excludedId), false);
+      }
     });
 
     await context.test("logout invalidates the persisted session version", async () => {

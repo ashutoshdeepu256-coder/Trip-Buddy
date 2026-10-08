@@ -58,6 +58,7 @@ const tripSchema = new mongoose.Schema(
     accommodationPreference: listOfStrings,
     transportPreference: listOfStrings,
     foodPreference: listOfStrings,
+    languages: listOfStrings,
     privacy: {
       type: String,
       enum: ["PUBLIC", "COMMUNITY", "PRIVATE", "INVITE_ONLY"],
@@ -83,6 +84,7 @@ tripSchema.index({ destination: 1, status: 1, startDate: 1 });
 tripSchema.index({ status: 1, privacy: 1, startDate: 1 });
 tripSchema.index({ status: 1, startDate: 1, endDate: 1 });
 tripSchema.index({ status: 1, "budget.min": 1, "budget.max": 1 });
+tripSchema.index({ status: 1, privacy: 1, startDate: 1, "budget.currency": 1 });
 tripSchema.index({ location: "2dsphere" });
 
 module.exports = mongoose.models.Trip || mongoose.model("Trip", tripSchema);

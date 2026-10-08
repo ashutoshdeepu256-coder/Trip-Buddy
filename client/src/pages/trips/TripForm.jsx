@@ -22,6 +22,7 @@ const formSchema = z.object({
   accommodationPreference: z.string().max(500),
   transportPreference: z.string().max(500),
   foodPreference: z.string().max(500),
+  languages: z.string().max(500),
   privacy: z.enum(['PUBLIC', 'COMMUNITY', 'PRIVATE', 'INVITE_ONLY']),
 }).superRefine((values, context) => {
   if (values.startDate && values.endDate && new Date(values.endDate) <= new Date(values.startDate)) {
@@ -72,6 +73,7 @@ function TripForm({ trip, submitting, error, onSave, onRemoveImage }) {
     accommodationPreference: joinList(trip?.accommodationPreference),
     transportPreference: joinList(trip?.transportPreference),
     foodPreference: joinList(trip?.foodPreference),
+    languages: joinList(trip?.languages),
     privacy: trip?.privacy || 'PUBLIC',
   }), [trip])
   const {
@@ -138,6 +140,7 @@ function TripForm({ trip, submitting, error, onSave, onRemoveImage }) {
         accommodationPreference: splitList(values.accommodationPreference),
         transportPreference: splitList(values.transportPreference),
         foodPreference: splitList(values.foodPreference),
+        languages: splitList(values.languages),
         privacy: values.privacy,
       }, selectedFiles)
     } catch (requestError) {
@@ -229,6 +232,7 @@ function TripForm({ trip, submitting, error, onSave, onRemoveImage }) {
             ['accommodationPreference', 'Accommodation preferences'],
             ['transportPreference', 'Transport preferences'],
             ['foodPreference', 'Food preferences'],
+            ['languages', 'Languages for this trip'],
           ].map(([name, label]) => (
             <label className="trip-field" key={name}><span>{label}</span><input {...register(name)} placeholder="Comma-separated" /><small>Separate multiple options with commas.</small></label>
           ))}

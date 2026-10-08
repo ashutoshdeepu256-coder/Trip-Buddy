@@ -22,6 +22,7 @@ const allowedUpdateFields = [
   "accommodationPreference",
   "transportPreference",
   "foodPreference",
+  "languages",
   "privacy",
   "location",
 ];
@@ -78,6 +79,7 @@ const serializeTrip = (trip) => {
     accommodationPreference: value.accommodationPreference,
     transportPreference: value.transportPreference,
     foodPreference: value.foodPreference,
+    languages: value.languages || [],
     privacy: value.privacy,
     status: value.status,
     images: (value.images || []).map(({ url, format, uploadedAt }) => ({ url, format, uploadedAt })),

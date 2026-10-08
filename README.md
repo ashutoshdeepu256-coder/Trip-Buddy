@@ -18,9 +18,10 @@ verification, and safety foundations.
 
 Optional provider configuration and API details are documented in
 [verification API docs](./docs/api/verifications.md) and
-[safety API docs](./docs/api/safety.md) and
-[destination discovery API docs](./docs/api/destinations.md) and
-[trip API docs](./docs/api/trips.md).
+[safety API docs](./docs/api/safety.md),
+[destination discovery API docs](./docs/api/destinations.md),
+[trip API docs](./docs/api/trips.md), and
+[trip discovery API docs](./docs/api/trip-discovery.md).
 
 Destination Discovery is data-driven and ships without production destination
 records. Import an explicitly curated JSON catalog with
@@ -33,6 +34,12 @@ private drafts; publishing performs stricter server-side validation. Configure
 `CLOUDINARY_URL` to enable JPEG, PNG, and WEBP trip image uploads. Trip model,
 lifecycle, privacy, index, and future phase integration decisions are in
 [trip architecture](./docs/architecture/trips.md).
+
+Discover published trips at `/trips`; search and filters are stored in the URL.
+Discovery reads real MongoDB trips and destination/user records, excludes
+private/invite-only/draft/cancelled/full trips, and requires exact currency
+matches when a budget filter is used. `/my-trips` retains the authenticated
+trip-management page.
 
 ## Validation
 

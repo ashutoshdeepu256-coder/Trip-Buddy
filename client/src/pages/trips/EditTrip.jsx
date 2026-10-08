@@ -40,13 +40,13 @@ function EditTrip() {
   }, [fetchTrip, tripId])
 
   if (loading) return <main className="page-loading" role="status">Loading trip…</main>
-  if (pageError || !trip) return <main className="trip-shell"><p className="form-error" role="alert">{pageError || error || 'Trip not found.'}</p><Link to="/trips">Return to my trips</Link></main>
+  if (pageError || !trip) return <main className="trip-shell"><p className="form-error" role="alert">{pageError || error || 'Trip not found.'}</p><Link to="/my-trips">Return to my trips</Link></main>
   if (!trip.isOwner) return <main className="trip-shell"><p className="form-error" role="alert">Only the trip creator can edit this trip.</p><Link to={`/trips/${tripId}`}>View trip</Link></main>
   if (['CANCELLED', 'COMPLETED'].includes(trip.status)) return <main className="trip-shell"><p className="form-error" role="alert">This trip can no longer be edited.</p><Link to={`/trips/${tripId}`}>View trip</Link></main>
 
   return (
     <main className="trip-shell">
-      <header className="trip-page-header"><Link to="/" className="destination-brand">TripBuddy</Link><nav><Link to="/trips">My trips</Link><Link to={`/trips/${tripId}`}>View trip</Link></nav></header>
+      <header className="trip-page-header"><Link to="/" className="destination-brand">TripBuddy</Link><nav><Link to="/my-trips">My trips</Link><Link to={`/trips/${tripId}`}>View trip</Link></nav></header>
       <section className="trip-page-intro"><span className="eyebrow">Update your plan</span><h1>Edit trip</h1><p>Changes are saved as trip details. Lifecycle status can only be changed using its dedicated actions.</p></section>
       <TripForm trip={trip} submitting={saving} error={error} onSave={save} onRemoveImage={removeImage} />
     </main>

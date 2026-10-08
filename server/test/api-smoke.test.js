@@ -5,6 +5,7 @@ process.env.JWT_SECRET =
   process.env.JWT_SECRET || "test-only-secret-with-at-least-thirty-two-characters";
 const app = require("../app");
 const destinationService = require("../src/services/destination.service");
+const tripDiscoveryService = require("../src/services/tripDiscovery.service");
 
 let server;
 let origin;
@@ -98,6 +99,41 @@ test("popular, trending, nearby, and detail destination endpoints are wired", as
       items: [{ slug: `${kind}-destination` }],
       pagination: { page: 1, limit: 12, total: 1, pages: 1 },
     };
+  });
+
+  test("trip discovery endpoint validates filters and returns the discovery envelope", async (context) => {
+    const discover = context.mock.method(tripDiscoveryService, "discoverTrips", async (filters, user) => {
+      assert.equal(filters.destination, "coastal-example");
+      assert.equal(filters.budgetCurrency, "INR");
+      assert.equal(filters.budgetMin, 1000);
+      assert.deepEqual(filters.interests, ["food", "history"]);
+      assert.equal(filters.limit, 20);
+      assert.equal(user, null);
+      return { items: [], page: 1, limit: 20, total: 0, totalPages: 0, hasNextPage: false, hasPreviousPage: false };
+    });
+    const { response, payload } = await request(
+      "GET",
+      "/api/v1/trips?destination=coastal-example&budgetMin=1000&budgetCurrency=inr&interests=Food,history",
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(payload.data, {
+      items: [],
+      page: 1,
+      limit: 20,
+      total: 0,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    });
+    assert.equal(discover.mock.callCount(), 1);
+  });
+
+  test("trip discovery rejects unsafe and unbounded query parameters before service access", async () => {
+    for (const query of ["limit=1000", "dateFlexibility=2", "budgetMin=100", "sort=%24where"]) {
+      const { response, payload } = await request("GET", `/api/v1/trips?${query}`);
+      assert.equal(response.status, 400);
+      assert.equal(payload.error.code, "VALIDATION_ERROR");
+    }
   });
   for (const kind of ["seasonal", "budget", "adventure"]) {
     context.mock.method(destinationService, `list${kind[0].toUpperCase()}${kind.slice(1)}`, async (options) => ({
