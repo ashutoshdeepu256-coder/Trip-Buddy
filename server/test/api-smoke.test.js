@@ -156,6 +156,14 @@ const protectedRoutes = [
   ["POST", "/api/v1/safety/reports"],
   ["GET", "/api/v1/safety/admin/reports"],
   ["PATCH", "/api/v1/safety/admin/reports/64b000000000000000000001"],
+  ["GET", "/api/v1/users/me/trips"],
+  ["POST", "/api/v1/trips"],
+  ["PATCH", "/api/v1/trips/64b000000000000000000001"],
+  ["DELETE", "/api/v1/trips/64b000000000000000000001"],
+  ["POST", "/api/v1/trips/64b000000000000000000001/publish"],
+  ["POST", "/api/v1/trips/64b000000000000000000001/cancel"],
+  ["POST", "/api/v1/trips/64b000000000000000000001/status"],
+  ["POST", "/api/v1/trips/64b000000000000000000001/images"],
 ];
 
 for (const [method, path] of protectedRoutes) {
@@ -166,6 +174,18 @@ for (const [method, path] of protectedRoutes) {
     assert.equal(payload.error.code, "UNAUTHENTICATED");
   });
 }
+
+test("trip detail rejects malformed ids before database access", async () => {
+  const { response, payload } = await request("GET", "/api/v1/trips/not-an-id");
+  assert.equal(response.status, 400);
+  assert.equal(payload.error.code, "VALIDATION_ERROR");
+});
+
+test("trip creation rejects invalid draft fields after authentication", async () => {
+  const { response, payload } = await request("POST", "/api/v1/trips", { destination: "invalid" });
+  assert.equal(response.status, 401);
+  assert.equal(payload.error.code, "UNAUTHENTICATED");
+});
 
 test("unknown API routes return a standard 404 response", async () => {
   const { response, payload } = await request("GET", "/api/v1/not-a-real-endpoint");

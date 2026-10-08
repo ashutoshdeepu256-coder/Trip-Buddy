@@ -21,11 +21,13 @@ if (!process.env.MONGODB_TEST_URI) {
   const Block = require("../src/models/Block");
   const Report = require("../src/models/Report");
   const Destination = require("../src/models/Destination");
+  const Trip = require("../src/models/Trip");
+  const TripMember = require("../src/models/TripMember");
 
   test("MongoDB-backed Phase 4/5 and Phase 6 workflows", async (context) => {
     await mongoose.connect(process.env.MONGODB_TEST_URI, { serverSelectionTimeoutMS: 3000 });
     await Promise.all(
-      [User, Verification, EmailVerificationToken, AuditLog, Block, Report, Destination].map((model) =>
+      [User, Verification, EmailVerificationToken, AuditLog, Block, Report, Destination, Trip, TripMember].map((model) =>
         model.init(),
       ),
     );
@@ -438,6 +440,121 @@ if (!process.env.MONGODB_TEST_URI) {
       assert.equal(detail.response.status, 200);
       assert.equal(detail.payload.data.communityStatistics.tripsCount, 4);
       assert.deepEqual(detail.payload.data.communityTrips, []);
+    });
+
+    await context.test("trip drafts persist, enforce privacy and ownership, publish, cancel, and paginate", async () => {
+      const tripBody = {
+        destination: (await mongoose.model("Destination").findOne({ slug: "coastal-example" }))._id.toString(),
+        title: "Coastal weekend plan",
+        description: "A group journey with time for exploring and shared meals.",
+        startDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
+        endDate: new Date(Date.now() + 50 * 24 * 60 * 60 * 1000).toISOString(),
+        budget: { min: 200, max: 500, currency: "USD" },
+        groupSize: { min: 1, max: 4 },
+        travelStyle: ["slow travel"],
+        interests: ["food", "walking"],
+        activities: ["walking"],
+        accommodationPreference: ["hotel"],
+        transportPreference: ["train"],
+        foodPreference: ["vegetarian"],
+        privacy: "PRIVATE",
+      };
+      const created = await request("POST", "/api/v1/trips", { cookie: owner.cookie, body: tripBody });
+      assert.equal(created.response.status, 201);
+      assert.equal(created.payload.data.status, "DRAFT");
+      assert.equal(await TripMember.countDocuments({ trip: created.payload.data.id, role: "OWNER", status: "ACTIVE" }), 1);
+      assert.ok(await Trip.findById(created.payload.data.id));
+
+      const updated = await request("PATCH", `/api/v1/trips/${created.payload.data.id}`, {
+        cookie: owner.cookie,
+        body: { title: "Updated coastal weekend" },
+      });
+      assert.equal(updated.response.status, 200);
+      assert.equal(updated.payload.data.title, "Updated coastal weekend");
+
+      const hidden = await request("GET", `/api/v1/trips/${created.payload.data.id}`);
+      assert.equal(hidden.response.status, 404);
+      const otherUpdate = await request("PATCH", `/api/v1/trips/${created.payload.data.id}`, {
+        cookie: other.cookie,
+        body: { title: "Unauthorized edit" },
+      });
+      assert.equal(otherUpdate.response.status, 403);
+      const otherDelete = await request("DELETE", `/api/v1/trips/${created.payload.data.id}`, { cookie: other.cookie });
+      assert.equal(otherDelete.response.status, 403);
+
+      const published = await request("POST", `/api/v1/trips/${created.payload.data.id}/publish`, {
+        cookie: owner.cookie,
+        body: {},
+      });
+      assert.equal(published.response.status, 200);
+      assert.equal(published.payload.data.status, "PUBLISHED");
+      assert.ok(published.payload.data.publishedAt);
+      const stillHidden = await request("GET", `/api/v1/trips/${created.payload.data.id}`, { cookie: other.cookie });
+      assert.equal(stillHidden.response.status, 404);
+
+      const cancelled = await request("POST", `/api/v1/trips/${created.payload.data.id}/cancel`, {
+        cookie: owner.cookie,
+        body: {},
+      });
+      assert.equal(cancelled.response.status, 200);
+      assert.equal(cancelled.payload.data.status, "CANCELLED");
+      const cancelAgain = await request("POST", `/api/v1/trips/${created.payload.data.id}/cancel`, {
+        cookie: owner.cookie,
+        body: {},
+      });
+      assert.equal(cancelAgain.response.status, 409);
+
+      const anotherDraft = await request("POST", "/api/v1/trips", {
+        cookie: owner.cookie,
+        body: { title: "Incomplete draft" },
+      });
+      assert.equal(anotherDraft.response.status, 201);
+      const page = await request("GET", "/api/v1/users/me/trips?page=1&limit=1", { cookie: owner.cookie });
+      assert.equal(page.response.status, 200);
+      assert.equal(page.payload.data.items.length, 1);
+      assert.equal(page.payload.data.limit, 1);
+      assert.ok(page.payload.data.total >= 2);
+      assert.equal(typeof page.payload.data.hasNextPage, "boolean");
+      const deleted = await request("DELETE", `/api/v1/trips/${anotherDraft.payload.data.id}`, { cookie: owner.cookie });
+      assert.equal(deleted.response.status, 200);
+    });
+
+    await context.test("published PUBLIC trips are visible while COMMUNITY trips require a session", async () => {
+      const destination = await mongoose.model("Destination").findOne({ slug: "coastal-example" });
+      const createAndPublish = async (privacy, title) => {
+        const startDate = new Date(Date.now() + 55 * 24 * 60 * 60 * 1000);
+        const endDate = new Date(startDate.getTime() + 2 * 24 * 60 * 60 * 1000);
+        const created = await request("POST", "/api/v1/trips", {
+          cookie: owner.cookie,
+          body: {
+            destination: destination._id.toString(),
+            title,
+            description: "A community trip listing with enough details to publish.",
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            budget: { min: 50, max: 100, currency: "USD" },
+            groupSize: { min: 1, max: 3 },
+            privacy,
+          },
+        });
+        assert.equal(created.response.status, 201);
+        const published = await request("POST", `/api/v1/trips/${created.payload.data.id}/publish`, {
+          cookie: owner.cookie,
+          body: {},
+        });
+        assert.equal(published.response.status, 200);
+        return created.payload.data.id;
+      };
+
+      const publicTripId = await createAndPublish("PUBLIC", "Open coastal trip");
+      const publicRead = await request("GET", `/api/v1/trips/${publicTripId}`);
+      assert.equal(publicRead.response.status, 200);
+      assert.equal(publicRead.payload.data.creator.email, undefined);
+      assert.equal(publicRead.payload.data.images.length, 0);
+
+      const communityTripId = await createAndPublish("COMMUNITY", "Community coastal trip");
+      assert.equal((await request("GET", `/api/v1/trips/${communityTripId}`)).response.status, 404);
+      assert.equal((await request("GET", `/api/v1/trips/${communityTripId}`, { cookie: other.cookie })).response.status, 200);
     });
 
     await context.test("logout invalidates the persisted session version", async () => {

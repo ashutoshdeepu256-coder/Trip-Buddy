@@ -10,6 +10,7 @@ const verificationRoutes = require("./src/routes/verification.routes");
 const adminVerificationRoutes = require("./src/routes/admin-verification.routes");
 const safetyRoutes = require("./src/routes/safety.routes");
 const destinationRoutes = require("./src/routes/destination.routes");
+const tripRoutes = require("./src/routes/trip.routes");
 
 const app = express();
 
@@ -53,6 +54,7 @@ app.use("/api/v1/verifications", verificationRoutes);
 app.use("/api/v1/admin/verifications", adminVerificationRoutes);
 app.use("/api/v1/safety", safetyRoutes);
 app.use("/api/v1/destinations", destinationRoutes);
+app.use("/api/v1", tripRoutes);
 
 app.use((req, _res, next) => {
   next(new HttpError(404, "Route was not found", "NOT_FOUND"));
