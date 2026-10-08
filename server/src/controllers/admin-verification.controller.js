@@ -5,7 +5,7 @@ const {
 } = require("../services/identity-storage.service");
 
 const list = async (req, res) =>
-  sendSuccess(res, await verificationService.listAdminVerifications(req.query));
+  sendSuccess(res, await verificationService.listAdminVerifications(req.validatedQuery));
 
 const detail = async (req, res) =>
   sendSuccess(res, await verificationService.getAdminVerification(req.params.verificationId));

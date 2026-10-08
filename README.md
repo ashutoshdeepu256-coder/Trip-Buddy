@@ -18,7 +18,14 @@ verification, and safety foundations.
 
 Optional provider configuration and API details are documented in
 [verification API docs](./docs/api/verifications.md) and
-[safety API docs](./docs/api/safety.md).
+[safety API docs](./docs/api/safety.md) and
+[destination discovery API docs](./docs/api/destinations.md).
+
+Destination Discovery is data-driven and ships without production destination
+records. Import an explicitly curated JSON catalog with
+`npm run seed:destinations --workspace=server -- <path-to-json>`. Search,
+ranked feeds, seasonal/budget/adventure filters, nearby discovery, and
+destination detail pages are available at `/destinations`.
 
 ## Validation
 

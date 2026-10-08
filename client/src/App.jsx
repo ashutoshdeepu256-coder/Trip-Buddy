@@ -8,6 +8,8 @@ import PublicProfilePage from './pages/PublicProfilePage'
 import EmailVerificationPage from './pages/EmailVerificationPage'
 import VerificationCenter from './pages/verification/VerificationCenter'
 import IdentityVerification from './pages/verification/IdentityVerification'
+import DestinationDiscovery from './pages/DestinationDiscovery'
+import DestinationPage from './pages/DestinationPage'
 
 const facts = [
   { label: 'Travel style', value: 'Your pace' },
@@ -56,6 +58,7 @@ function App() {
         </Link>
 
         <nav className="main-nav" aria-label="Main navigation">
+          <Link to="/destinations">Destinations</Link>
           <a href="#features">Features</a>
           <a href="#plans">Trip ideas</a>
           <a href="#pricing">Pricing</a>
@@ -177,6 +180,8 @@ function App() {
       <Route path="/login" element={<AuthPage mode="login" />} />
       <Route path="/register" element={<AuthPage mode="register" />} />
       <Route path="/verify-email" element={<EmailVerificationPage />} />
+      <Route path="/destinations" element={<DestinationDiscovery />} />
+      <Route path="/destinations/:id" element={<DestinationPage />} />
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       <Route path="/profile/edit" element={<ProtectedRoute><ProfilePage edit /></ProtectedRoute>} />
       <Route path="/profile/travel-preferences" element={<ProtectedRoute><ProfilePage edit travelPreferences /></ProtectedRoute>} />

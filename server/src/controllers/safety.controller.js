@@ -17,9 +17,9 @@ const listReports = async (req, res) =>
   sendSuccess(
     res,
     await safetyService.listReports({
-      status: req.query.status,
-      page: req.query.page,
-      limit: req.query.limit,
+      status: req.validatedQuery.status,
+      page: req.validatedQuery.page,
+      limit: req.validatedQuery.limit,
     }),
   );
 

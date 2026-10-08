@@ -20,11 +20,12 @@ if (!process.env.MONGODB_TEST_URI) {
   const AuditLog = require("../src/models/AuditLog");
   const Block = require("../src/models/Block");
   const Report = require("../src/models/Report");
+  const Destination = require("../src/models/Destination");
 
   test("MongoDB-backed Phase 4/5 and Phase 6 workflows", async (context) => {
     await mongoose.connect(process.env.MONGODB_TEST_URI, { serverSelectionTimeoutMS: 3000 });
     await Promise.all(
-      [User, Verification, EmailVerificationToken, AuditLog, Block, Report].map((model) =>
+      [User, Verification, EmailVerificationToken, AuditLog, Block, Report, Destination].map((model) =>
         model.init(),
       ),
     );
@@ -379,6 +380,64 @@ if (!process.env.MONGODB_TEST_URI) {
       assert.equal(review.payload.data.status, "RESOLVED");
       assert.equal(await AuditLog.countDocuments({ action: "USER_REPORTED" }), 1);
       assert.equal(await AuditLog.countDocuments({ action: "ADMIN_ACTION" }), 1);
+    });
+
+    await context.test("destination search, ranked feeds, geo search, pagination, and detail are data-backed", async () => {
+      const destinations = await Destination.create([
+        {
+          name: "Coastal Example",
+          slug: "coastal-example",
+          country: "Exampleland",
+          city: "Harbor",
+          description: "Coastal walks and locally curated food.",
+          coordinates: { type: "Point", coordinates: [-122.4, 37.8] },
+          images: [{ url: "https://images.example.test/coast.jpg", alt: "Coastline" }],
+          activities: ["walking", "food"],
+          categories: ["BEACH"],
+          bestMonths: [5, 6, 7],
+          estimatedBudget: { min: 100, max: 200, currency: "USD", period: "DAY" },
+          popularity: { score: 80, trendScore: 30 },
+          communityStatistics: { tripsCount: 4, travelersCount: 10, buddiesCount: 2 },
+        },
+        {
+          name: "Mountain Example",
+          slug: "mountain-example",
+          country: "Exampleland",
+          description: "A place for climbing and hiking.",
+          coordinates: { type: "Point", coordinates: [-122.3, 37.7] },
+          activities: ["hiking", "climbing"],
+          categories: ["ADVENTURE", "NATURE"],
+          adventure: true,
+          bestMonths: [6, 7, 8],
+          estimatedBudget: { min: 70, max: 150, currency: "USD", period: "DAY" },
+          popularity: { score: 40, trendScore: 90 },
+        },
+      ]);
+
+      const search = await request("GET", "/api/v1/destinations?search=coastal&page=1&limit=1");
+      assert.equal(search.response.status, 200);
+      assert.equal(search.payload.data.items.length, 1);
+      assert.equal(search.payload.data.items[0].slug, "coastal-example");
+      assert.equal(search.payload.data.pagination.total, 1);
+      assert.equal(search.payload.data.items[0].heroImage.alt, "Coastline");
+
+      const popular = await request("GET", "/api/v1/destinations/popular");
+      assert.equal(popular.payload.data.items[0].slug, "coastal-example");
+      const trending = await request("GET", "/api/v1/destinations/trending");
+      assert.equal(trending.payload.data.items[0].slug, "mountain-example");
+      const seasonal = await request("GET", "/api/v1/destinations/seasonal?month=5");
+      assert.deepEqual(seasonal.payload.data.items.map((item) => item.slug), ["coastal-example"]);
+      const adventure = await request("GET", "/api/v1/destinations/adventure");
+      assert.deepEqual(adventure.payload.data.items.map((item) => item.slug), ["mountain-example"]);
+      const budget = await request("GET", "/api/v1/destinations/budget");
+      assert.equal(budget.payload.data.items[0].slug, "mountain-example");
+      const nearby = await request("GET", "/api/v1/destinations/nearby?lat=37.8&lng=-122.4&radiusKm=30");
+      assert.equal(nearby.response.status, 200);
+      assert.equal(nearby.payload.data.items.length, 2);
+      const detail = await request("GET", `/api/v1/destinations/${destinations[0].slug}`);
+      assert.equal(detail.response.status, 200);
+      assert.equal(detail.payload.data.communityStatistics.tripsCount, 4);
+      assert.deepEqual(detail.payload.data.communityTrips, []);
     });
 
     await context.test("logout invalidates the persisted session version", async () => {
