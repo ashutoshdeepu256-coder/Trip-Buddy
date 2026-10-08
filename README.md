@@ -19,13 +19,20 @@ verification, and safety foundations.
 Optional provider configuration and API details are documented in
 [verification API docs](./docs/api/verifications.md) and
 [safety API docs](./docs/api/safety.md) and
-[destination discovery API docs](./docs/api/destinations.md).
+[destination discovery API docs](./docs/api/destinations.md) and
+[trip API docs](./docs/api/trips.md).
 
 Destination Discovery is data-driven and ships without production destination
 records. Import an explicitly curated JSON catalog with
 `npm run seed:destinations --workspace=server -- <path-to-json>`. Search,
 ranked feeds, seasonal/budget/adventure filters, nearby discovery, and
 destination detail pages are available at `/destinations`.
+
+Trip creation uses the existing Destination catalog. Incomplete plans save as
+private drafts; publishing performs stricter server-side validation. Configure
+`CLOUDINARY_URL` to enable JPEG, PNG, and WEBP trip image uploads. Trip model,
+lifecycle, privacy, index, and future phase integration decisions are in
+[trip architecture](./docs/architecture/trips.md).
 
 ## Validation
 

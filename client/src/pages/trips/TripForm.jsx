@@ -132,22 +132,26 @@ function TripForm({ trip, submitting, error, onSave, onRemoveImage }) {
       setError('budgetMax', { type: 'manual', message: 'Maximum budget must be at least the minimum.' })
       return
     }
-    await onSave({
-      destination: values.destination || null,
-      title: values.title,
-      description: values.description,
-      startDate: values.startDate || null,
-      endDate: values.endDate || null,
-      budget: { min: budgetMin, max: budgetMax, currency: values.budgetCurrency },
-      groupSize: { min: Number(values.groupMin), max: Number(values.groupMax) },
-      travelStyle: splitList(values.travelStyle),
-      interests: splitList(values.interests),
-      activities: splitList(values.activities),
-      accommodationPreference: splitList(values.accommodationPreference),
-      transportPreference: splitList(values.transportPreference),
-      foodPreference: splitList(values.foodPreference),
-      privacy: values.privacy,
-    }, selectedFiles)
+    try {
+      await onSave({
+        destination: values.destination || null,
+        title: values.title,
+        description: values.description,
+        startDate: values.startDate || null,
+        endDate: values.endDate || null,
+        budget: { min: budgetMin, max: budgetMax, currency: values.budgetCurrency },
+        groupSize: { min: Number(values.groupMin), max: Number(values.groupMax) },
+        travelStyle: splitList(values.travelStyle),
+        interests: splitList(values.interests),
+        activities: splitList(values.activities),
+        accommodationPreference: splitList(values.accommodationPreference),
+        transportPreference: splitList(values.transportPreference),
+        foodPreference: splitList(values.foodPreference),
+        privacy: values.privacy,
+      }, selectedFiles)
+    } catch (requestError) {
+      setFormMessage(requestError.response?.data?.error?.message || 'The trip draft could not be saved.')
+    }
   })
 
   const selectDestination = (destination) => {
@@ -158,8 +162,8 @@ function TripForm({ trip, submitting, error, onSave, onRemoveImage }) {
 
   const uploadFiles = (event) => {
     const files = Array.from(event.target.files || [])
-    if (files.length > 8) {
-      setFormMessage('Select no more than 8 images.')
+    if (files.length + (trip?.images?.length || 0) > 8) {
+      setFormMessage('A trip can have no more than 8 images total.')
       event.target.value = ''
       return
     }

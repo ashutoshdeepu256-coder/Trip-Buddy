@@ -188,6 +188,22 @@ test("publishing an incomplete draft is rejected before changing its state", asy
   assert.equal(trip.status, "DRAFT");
 });
 
+test("lifecycle service rejects transitions outside the defined progression", async (context) => {
+  const trip = {
+    _id: new mongoose.Types.ObjectId(),
+    creator: ownerId,
+    status: "DRAFT",
+    startDate: new Date(Date.now() + 86400000),
+    endDate: new Date(Date.now() + 172800000),
+  };
+  context.mock.method(Trip, "findById", async () => trip);
+  await assert.rejects(
+    tripService.changeTripStatus(trip._id.toString(), { _id: ownerId }, "ONGOING"),
+    (error) => error.code === "INVALID_TRIP_STATUS" && error.statusCode === 409,
+  );
+  assert.equal(trip.status, "DRAFT");
+});
+
 test("private and invite-only trip access is concealed from non-members", async (context) => {
   const id = new mongoose.Types.ObjectId();
   const trip = {

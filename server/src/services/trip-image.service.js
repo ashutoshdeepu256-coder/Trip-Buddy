@@ -78,7 +78,11 @@ const uploadTripImages = async ({ tripId, userId, files, currentCount }) => {
       });
     }
     return uploaded;
-  } catch {
+  } catch (error) {
+    console.error("Trip image upload failed:", {
+      name: error.name,
+      code: error.http_code || error.code || "PROVIDER_ERROR",
+    });
     await Promise.all(
       uploaded.map((image) =>
         cloudinary.uploader.destroy(image.publicId, { resource_type: "image" }),

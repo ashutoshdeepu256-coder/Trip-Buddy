@@ -509,6 +509,20 @@ if (!process.env.MONGODB_TEST_URI) {
         body: { title: "Incomplete draft" },
       });
       assert.equal(anotherDraft.response.status, 201);
+      const incompletePublish = await request("POST", `/api/v1/trips/${anotherDraft.payload.data.id}/publish`, {
+        cookie: owner.cookie,
+        body: {},
+      });
+      assert.equal(incompletePublish.response.status, 400);
+      assert.equal(incompletePublish.payload.error.code, "TRIP_VALIDATION_ERROR");
+      const invalidImageForm = new FormData();
+      invalidImageForm.append("images", new Blob(["not a PNG"], { type: "image/png" }), "client-name.png");
+      const invalidImage = await request("POST", `/api/v1/trips/${anotherDraft.payload.data.id}/images`, {
+        cookie: owner.cookie,
+        form: invalidImageForm,
+      });
+      assert.equal(invalidImage.response.status, 400);
+      assert.equal(invalidImage.payload.error.code, "INVALID_TRIP_IMAGE");
       const page = await request("GET", "/api/v1/users/me/trips?page=1&limit=1", { cookie: owner.cookie });
       assert.equal(page.response.status, 200);
       assert.equal(page.payload.data.items.length, 1);
@@ -555,6 +569,9 @@ if (!process.env.MONGODB_TEST_URI) {
       const communityTripId = await createAndPublish("COMMUNITY", "Community coastal trip");
       assert.equal((await request("GET", `/api/v1/trips/${communityTripId}`)).response.status, 404);
       assert.equal((await request("GET", `/api/v1/trips/${communityTripId}`, { cookie: other.cookie })).response.status, 200);
+
+      const inviteOnlyTripId = await createAndPublish("INVITE_ONLY", "Invite-only coastal trip");
+      assert.equal((await request("GET", `/api/v1/trips/${inviteOnlyTripId}`, { cookie: other.cookie })).response.status, 404);
     });
 
     await context.test("logout invalidates the persisted session version", async () => {
