@@ -45,6 +45,7 @@ const tripFields = {
   transportPreference: stringList(),
   foodPreference: stringList(),
   languages: stringList(10),
+  travelPace: z.enum(["RELAXED", "MODERATE", "FAST"]).nullable().optional(),
   privacy: z.enum(privacyValues).default("PUBLIC"),
   location: z.object({
     type: z.literal("Point").default("Point"),
@@ -69,6 +70,7 @@ const updateTripSchema = z.object({
   transportPreference: stringList().optional(),
   foodPreference: stringList().optional(),
   languages: stringList(10).optional(),
+  travelPace: tripFields.travelPace,
   privacy: z.enum(privacyValues).optional(),
   location: tripFields.location.optional(),
 }).partial().superRefine(validateDateOrder);

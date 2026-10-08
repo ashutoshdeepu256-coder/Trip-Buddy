@@ -23,6 +23,7 @@ const formSchema = z.object({
   transportPreference: z.string().max(500),
   foodPreference: z.string().max(500),
   languages: z.string().max(500),
+  travelPace: z.enum(['', 'RELAXED', 'MODERATE', 'FAST']),
   privacy: z.enum(['PUBLIC', 'COMMUNITY', 'PRIVATE', 'INVITE_ONLY']),
 }).superRefine((values, context) => {
   if (values.startDate && values.endDate && new Date(values.endDate) <= new Date(values.startDate)) {
@@ -74,6 +75,7 @@ function TripForm({ trip, submitting, error, onSave, onRemoveImage }) {
     transportPreference: joinList(trip?.transportPreference),
     foodPreference: joinList(trip?.foodPreference),
     languages: joinList(trip?.languages),
+    travelPace: trip?.travelPace || '',
     privacy: trip?.privacy || 'PUBLIC',
   }), [trip])
   const {
@@ -141,6 +143,7 @@ function TripForm({ trip, submitting, error, onSave, onRemoveImage }) {
         transportPreference: splitList(values.transportPreference),
         foodPreference: splitList(values.foodPreference),
         languages: splitList(values.languages),
+        travelPace: values.travelPace || null,
         privacy: values.privacy,
       }, selectedFiles)
     } catch (requestError) {
@@ -236,6 +239,14 @@ function TripForm({ trip, submitting, error, onSave, onRemoveImage }) {
           ].map(([name, label]) => (
             <label className="trip-field" key={name}><span>{label}</span><input {...register(name)} placeholder="Comma-separated" /><small>Separate multiple options with commas.</small></label>
           ))}
+          <label className="trip-field"><span>Travel pace</span>
+            <select {...register('travelPace')}>
+              <option value="">Not specified</option>
+              <option value="RELAXED">Relaxed</option>
+              <option value="MODERATE">Moderate</option>
+              <option value="FAST">Fast</option>
+            </select>
+          </label>
         </div>
       </details>
 

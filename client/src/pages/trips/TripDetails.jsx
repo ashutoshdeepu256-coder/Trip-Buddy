@@ -1,6 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTripStore } from '../../store/tripStore'
+import { useAuthStore } from '../../store/authStore'
+import matchingService from '../../services/matchingService'
+import CompatibilityScore from '../../components/matching/CompatibilityScore'
 import '../TripPages.css'
 
 const nextStatus = {
@@ -19,6 +22,8 @@ function TripDetails() {
   const { tripId } = useParams()
   const navigate = useNavigate()
   const trip = useTripStore((state) => state.currentTrip)
+  const user = useAuthStore((state) => state.user)
+  const authLoading = useAuthStore((state) => state.loading)
   const loading = useTripStore((state) => state.loading)
   const saving = useTripStore((state) => state.saving)
   const error = useTripStore((state) => state.error)
@@ -27,14 +32,67 @@ function TripDetails() {
   const cancelTrip = useTripStore((state) => state.cancelTrip)
   const changeTripStatus = useTripStore((state) => state.changeTripStatus)
   const deleteTrip = useTripStore((state) => state.deleteTrip)
+  const [matchingData, setMatchingData] = useState(null)
+  const [refreshingMatch, setRefreshingMatch] = useState(false)
+  const matchingKey = user && trip ? `${tripId}:${user.id}:${user.updatedAt || ''}` : null
+  const matchingLoading = Boolean(matchingKey && matchingData?.key !== matchingKey)
+  const compatibility = matchingData?.key === matchingKey ? matchingData.result : null
+  const matchingError = matchingData?.key === matchingKey ? matchingData.error : ''
 
   useEffect(() => {
     fetchTrip(tripId).catch(() => {})
   }, [fetchTrip, tripId])
 
+  useEffect(() => {
+    if (authLoading || !user || !trip || trip.id !== tripId || trip.isOwner) {
+      return undefined
+    }
+    let active = true
+    const key = `${tripId}:${user.id}:${user.updatedAt || ''}`
+    matchingService.getTripCompatibility(tripId)
+      .then((result) => { if (active) setMatchingData({ key, result, error: '' }) })
+      .catch((requestError) => {
+        if (active) setMatchingData({
+          key,
+          result: null,
+          error: requestError.response?.data?.error?.message || 'Compatibility could not be calculated.',
+        })
+      })
+    return () => { active = false }
+  }, [authLoading, trip, tripId, user])
+
   const owner = trip?.isOwner
   const action = async (operation) => {
     try { await operation(tripId) } catch { /* Store exposes the request error. */ }
+  }
+  const refreshCompatibility = async () => {
+    setRefreshingMatch(true)
+    setMatchingData({ key: matchingKey, result: compatibility, error: '' })
+    try {
+      const match = await matchingService.refreshTripCompatibility(tripId)
+      setMatchingData({ key: matchingKey, error: '', result: {
+        overallScore: match.score,
+        category: match.category,
+        scoreBasis: match.scoreBasis,
+        dataCoverage: match.dataCoverage,
+        breakdown: match.scoreBreakdown,
+        dimensionStatus: match.dimensionStatus,
+        preferenceBreakdown: match.preferenceBreakdown,
+        reasons: match.reasons,
+        matchReasons: match.matchReasons,
+        potentialDifferences: match.potentialDifferences,
+        evaluatedDimensions: match.evaluatedDimensions,
+        unknownDimensions: match.unknownDimensions,
+      } })
+    } catch (requestError) {
+      setMatchingData({
+        key: matchingKey,
+        result: compatibility,
+        error: requestError.response?.data?.error?.message || 'Compatibility could not be refreshed.',
+      })
+    } finally {
+      setRefreshingMatch(false)
+    }
   }
 
   if (loading) return <main className="page-loading" role="status">Loading trip…</main>
@@ -75,8 +133,18 @@ function TripDetails() {
             <p><strong>Accommodation</strong><span>{formatList(trip.accommodationPreference)}</span></p>
             <p><strong>Transport</strong><span>{formatList(trip.transportPreference)}</span></p>
             <p><strong>Food preferences</strong><span>{formatList(trip.foodPreference)}</span></p>
+            <p><strong>Travel pace</strong><span>{pretty(trip.travelPace)}</span></p>
           </section>
           <section className="trip-panel"><h2>Plan together</h2><p>Trip discovery and matching, connections, group planning, and chat will connect here in later phases.</p><div className="trip-future-grid"><span>Matching · planned</span><span>Connections · planned</span><span>Group · planned</span><span>Chat · planned</span></div></section>
+          {trip.isOwner
+            ? <section className="trip-panel"><h2>Traveler matching</h2><p>Compatibility is private to each traveler. You can manage this trip here; traveler discovery will be added in a later phase.</p></section>
+            : !user && !authLoading
+              ? <section className="trip-panel"><h2>Travel compatibility</h2><p>Sign in to see how this trip aligns with your travel preferences.</p><Link className="primary-btn" to="/login">Sign in to check compatibility</Link></section>
+              : user && <section className="trip-panel">
+                {matchingLoading && <p role="status">Calculating your travel compatibility…</p>}
+                {matchingError && <p className="form-error" role="alert">{matchingError}</p>}
+                <CompatibilityScore compatibility={compatibility} onRefresh={refreshCompatibility} refreshing={refreshingMatch} />
+              </section>}
         </div>
         <aside className="trip-detail-side">
           <section className="trip-panel"><h2>Destination</h2>

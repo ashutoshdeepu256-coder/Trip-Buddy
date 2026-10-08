@@ -2,6 +2,10 @@ const mongoose = require("mongoose");
 const Destination = require("../models/Destination");
 const Trip = require("../models/Trip");
 const { HttpError } = require("../utils/http");
+const matchService = require("./match.service");
+const safetyService = require("./safety.service");
+
+const COMPATIBILITY_CANDIDATE_LIMIT = 500;
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const exactInsensitive = (value) => new RegExp(`^${escapeRegex(value)}$`, "i");
@@ -176,6 +180,7 @@ const safeCard = (trip) => {
     transportPreference: trip.transportPreference || [],
     foodPreference: trip.foodPreference || [],
     languages: trip.languages || [],
+    travelPace: trip.travelPace || null,
     coverImage: images[0] ? { url: images[0].url, format: images[0].format } : null,
     creator: {
       id: trip.creatorDoc._id.toString(),
@@ -198,7 +203,86 @@ const discoverTrips = async (filters, user = null) => {
     throw new HttpError(422, "Age filtering is unavailable because TripBuddy does not currently collect date of birth or age-display consent", "AGE_FILTER_UNAVAILABLE");
   }
   if (filters.sort === "compatibility") {
-    throw new HttpError(501, "Compatibility sorting will be available with the Phase 10 compatibility engine", "COMPATIBILITY_SORT_UNAVAILABLE");
+    if (!user) {
+      throw new HttpError(401, "Sign in to sort trips by compatibility", "UNAUTHENTICATED");
+    }
+    const destinationIds = await resolveDestinationIds(filters.destination);
+    const pipeline = buildDiscoveryPipeline(filters, user, destinationIds);
+    pipeline[0].$match.creator = { $ne: user._id };
+    pipeline.push(
+      { $sort: { createdAt: -1, _id: -1 } },
+      { $limit: COMPATIBILITY_CANDIDATE_LIMIT + 1 },
+      {
+        $project: {
+          _id: 1,
+          title: 1,
+          startDate: 1,
+          endDate: 1,
+          budget: 1,
+          groupSize: 1,
+          travelStyle: 1,
+          interests: 1,
+          activities: 1,
+          accommodationPreference: 1,
+          transportPreference: 1,
+          foodPreference: 1,
+          languages: 1,
+          travelPace: 1,
+          privacy: 1,
+          status: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          currentMembers: 1,
+          availableSlots: 1,
+          creatorDoc: 1,
+          destinationDoc: 1,
+          images: { $slice: ["$images", 1] },
+        },
+      },
+    );
+    const candidates = await Trip.aggregate(pipeline);
+    const truncated = candidates.length > COMPATIBILITY_CANDIDATE_LIMIT;
+    const cappedCandidates = candidates.slice(0, COMPATIBILITY_CANDIDATE_LIMIT);
+    const blockedCreatorIds = new Set(await safetyService.getInteractionBlockedIds(
+      user._id,
+      cappedCandidates.map((candidate) => candidate.creatorDoc._id),
+    ));
+    const scored = await Promise.all(
+      cappedCandidates.filter((candidate) => !blockedCreatorIds.has(candidate.creatorDoc._id.toString())).map(async (candidate) => {
+        const compatibility = await matchService.calculateTripCompatibility({
+          trip: { ...candidate, destination: candidate.destinationDoc },
+          user,
+          currentMembers: candidate.currentMembers,
+        });
+        return {
+          item: safeCard(candidate),
+          score: compatibility.overallScore,
+          category: compatibility.category,
+        };
+      }),
+    );
+    scored.sort((left, right) =>
+      right.score - left.score ||
+      new Date(right.item.createdAt).getTime() - new Date(left.item.createdAt).getTime() ||
+      right.item.id.localeCompare(left.item.id),
+    );
+    const { page, limit } = filters;
+    const total = scored.length;
+    const totalPages = Math.ceil(total / limit);
+    return {
+      items: scored.slice((page - 1) * limit, page * limit).map(({ item, score, category }) => ({
+        ...item,
+        compatibility: { score, category },
+      })),
+      page,
+      limit,
+      total,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPreviousPage: page > 1,
+      truncated,
+      candidateLimit: COMPATIBILITY_CANDIDATE_LIMIT,
+    };
   }
   const destinationIds = await resolveDestinationIds(filters.destination);
   const pipeline = buildDiscoveryPipeline(filters, user, destinationIds);
@@ -253,6 +337,7 @@ const discoverTrips = async (filters, user = null) => {
 };
 
 module.exports = {
+  COMPATIBILITY_CANDIDATE_LIMIT,
   discoverTrips,
   buildDiscoveryPipeline,
   resolveDestinationIds,

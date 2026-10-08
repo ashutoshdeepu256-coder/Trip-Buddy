@@ -133,6 +133,7 @@
 .discovery-trip-destination { margin: 0 0 5px; color: #7dd3fc; font-size: .82rem; }
 .discovery-trip-card h2 { margin: 0 0 5px; font-size: 1.15rem; }
 .discovery-trip-card h2 a { color: #f8fbff; text-decoration: none; }
+.discovery-match-score { margin: 8px 0 0; color: #9fe6cd; font-size: .86rem; font-weight: 700; }
 .discovery-trip-meta, .discovery-trip-tags, .discovery-trip-interests { margin: 7px 0; color: #aebdd1; font-size: .86rem; }
 .discovery-trip-facts { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; margin-top: 12px; color: #e6eefc; font-size: .84rem; }
 .discovery-trip-tags { color: #c4b5fd; }

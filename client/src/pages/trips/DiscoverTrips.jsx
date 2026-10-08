@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import TripCard from '../../components/trip/TripCard'
 import destinationService from '../../services/destinationService'
 import { useTripDiscoveryStore } from '../../store/tripDiscoveryStore'
+import { useAuthStore } from '../../store/authStore'
 import '../TripPages.css'
 
 const listFilters = [
@@ -41,7 +42,7 @@ const valuesToQuery = (values) => {
   return query
 }
 
-function DiscoveryFilters({ initialParams, onApply, onClear, loading, open, onClose }) {
+function DiscoveryFilters({ initialParams, onApply, onClear, loading, open, onClose, isAuthenticated }) {
   const [values, setValues] = useState(() => readFilters(initialParams))
   const [formError, setFormError] = useState('')
   const [destinationOptions, setDestinationOptions] = useState([])
@@ -180,6 +181,7 @@ function DiscoveryFilters({ initialParams, onApply, onClear, loading, open, onCl
             <option value="recent">Recently created</option><option value="date">Trip date</option>
             <option value="budget_low">Budget: low to high</option><option value="budget_high">Budget: high to low</option>
             <option value="group_availability">Most open slots</option><option value="popularity">Most active members</option>
+            {isAuthenticated && <option value="compatibility">Best compatibility</option>}
           </select>
         </label>
         {formError && <p className="form-error" role="alert">{formError}</p>}
@@ -211,6 +213,7 @@ function DiscoverySearchBar({ initialValue, onSearch }) {
 }
 
 function DiscoverTrips() {
+  const user = useAuthStore((state) => state.user)
   const [searchParams, setSearchParams] = useSearchParams()
   const searchKey = searchParams.toString()
   const params = useMemo(() => Object.fromEntries(new URLSearchParams(searchKey)), [searchKey])
@@ -260,11 +263,13 @@ function DiscoverTrips() {
           onApply={applyFilters}
           onClear={clearFilters}
           loading={loading}
+          isAuthenticated={Boolean(user)}
           open={filtersOpen}
           onClose={() => setFiltersOpen(false)}
         />
         <section className="discovery-results" aria-label="Trip search results" aria-busy={loading}>
           {error && <div className="discovery-error" role="alert"><p>{error}</p><button className="secondary-btn" onClick={retry}>Try again</button></div>}
+          {pagination.truncated && <p className="discovery-footnote">Compatibility is ranked across the {pagination.candidateLimit} most recent eligible trips matching these filters.</p>}
           {loading ? <div className="discovery-trip-grid">{[0, 1, 2, 3, 4, 5].map((item) => <TripCardSkeleton key={item} />)}</div>
             : results.length ? <>
               <div className="discovery-trip-grid">{results.map((trip) => <TripCard key={trip.id} trip={trip} />)}</div>

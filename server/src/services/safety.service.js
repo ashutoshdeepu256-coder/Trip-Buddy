@@ -82,6 +82,19 @@ const isInteractionBlocked = async (firstUserId, secondUserId) =>
     }),
   );
 
+const getInteractionBlockedIds = async (userId, counterpartIds) => {
+  if (!counterpartIds.length) return [];
+  const blocks = await Block.find({
+    $or: [
+      { blocker: userId, blocked: { $in: counterpartIds } },
+      { blocked: userId, blocker: { $in: counterpartIds } },
+    ],
+  }).select("blocker blocked").lean();
+  return blocks.map((block) =>
+    block.blocker.toString() === userId.toString() ? block.blocked.toString() : block.blocker.toString(),
+  );
+};
+
 const createReport = async (actor, values, req) => {
   if (!mongoose.isValidObjectId(values.reportedUserId)) {
     throw new HttpError(400, "Invalid user ID", "INVALID_USER_ID");
@@ -180,6 +193,7 @@ module.exports = {
   unblockUser,
   getBlockedUsers,
   isInteractionBlocked,
+  getInteractionBlockedIds,
   createReport,
   listReports,
   reviewReport,

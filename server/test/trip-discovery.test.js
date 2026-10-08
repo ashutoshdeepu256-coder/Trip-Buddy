@@ -5,6 +5,8 @@ const Destination = require("../src/models/Destination");
 const Trip = require("../src/models/Trip");
 const TripMember = require("../src/models/TripMember");
 const tripDiscovery = require("../src/services/tripDiscovery.service");
+const matchService = require("../src/services/match.service");
+const safetyService = require("../src/services/safety.service");
 const { discoveryQuerySchema } = require("../src/validators/trip-discovery.validator");
 
 const parse = (query = {}) => discoveryQuerySchema.parse(query);
@@ -126,6 +128,54 @@ test("verified-only is based on existing identity verification and sort options 
   assert.equal(tripDiscovery.sortOptions.compatibility, undefined);
 });
 
+test("anonymous compatibility sorting is rejected before any database query", async () => {
+  await assert.rejects(
+    tripDiscovery.discoverTrips(parse({ sort: "compatibility" })),
+    (error) => error.statusCode === 401 && error.code === "UNAUTHENTICATED",
+  );
+});
+
+test("compatibility sorting is authenticated, excludes the user's own trips, and caps scoring candidates", async (context) => {
+  const viewerId = new mongoose.Types.ObjectId();
+  const firstId = new mongoose.Types.ObjectId();
+  const secondId = new mongoose.Types.ObjectId();
+  const candidate = (id, title) => ({
+    _id: id,
+    title,
+    destinationDoc: { _id: new mongoose.Types.ObjectId(), name: "Kyoto", slug: "kyoto", country: "Japan" },
+    creatorDoc: { _id: new mongoose.Types.ObjectId(), name: "Traveler", verification: {} },
+    startDate: new Date("2027-04-10"),
+    endDate: new Date("2027-04-12"),
+    groupSize: { min: 2, max: 5 },
+    currentMembers: 1,
+    availableSlots: 4,
+    images: [],
+    createdAt: new Date("2026-10-01"),
+    updatedAt: new Date("2026-10-01"),
+  });
+  let pipeline;
+  context.mock.method(Trip, "aggregate", async (value) => {
+    pipeline = value;
+    return [candidate(firstId, "Lower match"), candidate(secondId, "Higher match")];
+  });
+  context.mock.method(safetyService, "getInteractionBlockedIds", async (_userId, creatorIds) => [creatorIds[0].toString()]);
+  context.mock.method(matchService, "calculateTripCompatibility", async ({ trip: value }) => ({
+    overallScore: value._id.equals(secondId) ? 95 : 72,
+    category: value._id.equals(secondId) ? "EXCELLENT" : "MODERATE",
+  }));
+
+  const result = await tripDiscovery.discoverTrips(
+    parse({ sort: "compatibility", limit: "2" }),
+    { _id: viewerId, profile: { travelPreferences: { interests: ["hiking"] } } },
+  );
+  assert.equal(pipeline[0].$match.creator.$ne, viewerId);
+  assert.ok(pipeline.some((stage) => stage.$limit === tripDiscovery.COMPATIBILITY_CANDIDATE_LIMIT + 1));
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].title, "Higher match");
+  assert.deepEqual(result.items.map(({ compatibility }) => compatibility.score), [95]);
+  assert.equal(result.candidateLimit, 500);
+});
+
 test("destination lookup matches id, slug, or exact case-insensitive name", async (context) => {
   const selectors = [];
   context.mock.method(Destination, "find", (query) => {
@@ -209,13 +259,13 @@ test("discovery returns a paginated safe card from the aggregate result", async 
   ]);
 });
 
-test("unsupported age filters and compatibility sorting fail explicitly", async () => {
+test("unsupported age filters fail explicitly and compatibility sorting requires authentication", async () => {
   await assert.rejects(
     tripDiscovery.discoverTrips(parse({ ageMin: "25" })),
     (error) => error.statusCode === 422 && error.code === "AGE_FILTER_UNAVAILABLE",
   );
   await assert.rejects(
     tripDiscovery.discoverTrips(parse({ sort: "compatibility" })),
-    (error) => error.statusCode === 501 && error.code === "COMPATIBILITY_SORT_UNAVAILABLE",
+    (error) => error.statusCode === 401 && error.code === "UNAUTHENTICATED",
   );
 });

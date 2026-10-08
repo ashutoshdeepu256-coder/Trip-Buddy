@@ -3,7 +3,8 @@
 ## Entity boundaries
 
 `Trip` is the planning entity and references `User` and `Destination` by
-ObjectId. It stores trip-specific dates, budget, group size, preferences,
+ObjectId. It stores trip-specific dates, budget, group size, preferences and
+an optional `RELAXED`/`MODERATE`/`FAST` travel pace,
 privacy, status, images, optional GeoJSON location, and lifecycle timestamps.
 Trip languages are stored as a normalized bounded list for discovery matching.
 Destination facts remain in the existing Destination collection. `TripMember`
@@ -14,8 +15,9 @@ represented as an active `OWNER` edge at trip creation.
 The trip read serializer only returns creator name, location, join date, and
 factual verification booleans. It never returns email, phone, role, or
 provider-specific image IDs. Destination population is a field allowlist.
-Community trip listings and matching are intentionally deferred until their
-domain models exist.
+Community trip listings are available to signed-in users. Compatibility is
+private to the traveller whose profile preferences are evaluated; owners do
+not receive private traveller scores or profiles.
 
 ## Index decisions
 
@@ -65,7 +67,9 @@ both MIME and binary signatures, applies byte/file-count limits, stores image
 assets in Cloudinary, and stores only URL/provider ID/format/timestamp in
 MongoDB. Provider IDs are stripped from API output.
 
-Trip dates, destination, budget, interests, activities, travel style, and group
-size are explicit fields for Phase 9 discovery and Phase 10 compatibility.
-Connections, join requests, chat, AI plans, expenses, and reviews are not
-implemented here and have no fabricated records or implicit model behavior.
+Trip dates, destination, budget, interests, activities, travel style, pace, and
+group size are explicit fields for Phase 9 discovery and Phase 10
+compatibility. Traveller-specific matches are stored separately in `Match`;
+the scoring engine's weights and comparison formulas are documented in
+[matching engine architecture](./matching-engine.md). Connection workflows,
+join requests, chat, AI plans, expenses, and reviews are not implemented here.

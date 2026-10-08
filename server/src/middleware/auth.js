@@ -10,7 +10,7 @@ const getCookieOptions = () => ({
   maxAge: 7 * 24 * 60 * 60 * 1000,
 });
 
-const requireAuth = async (req, _res, next) => {
+const createAuthMiddleware = (projection) => async (req, _res, next) => {
   try {
     const token =
       req.cookies?.tripbuddy_session ||
@@ -28,7 +28,7 @@ const requireAuth = async (req, _res, next) => {
       issuer: "tripbuddy",
       audience: "tripbuddy-web",
     });
-    const user = await User.findById(payload.sub).select("+role +phoneNumber +tokenVersion");
+    const user = await User.findById(payload.sub).select(projection);
     if (!user) throw new HttpError(401, "Session is no longer valid", "UNAUTHENTICATED");
     if ((payload.v || 0) !== (user.tokenVersion || 0)) {
       throw new HttpError(401, "Session is no longer valid", "UNAUTHENTICATED");
@@ -40,6 +40,9 @@ const requireAuth = async (req, _res, next) => {
   }
 };
 
+const requireAuth = createAuthMiddleware("+role +phoneNumber +tokenVersion");
+const requireMatchingAuth = createAuthMiddleware("_id profile.travelPreferences updatedAt +tokenVersion");
+
 const requireModerator = (req, _res, next) => {
   if (!["ADMIN", "MODERATOR"].includes(req.user?.role)) {
     return next(new HttpError(403, "Moderator access is required", "FORBIDDEN"));
@@ -47,4 +50,4 @@ const requireModerator = (req, _res, next) => {
   next();
 };
 
-module.exports = { requireAuth, requireModerator, getCookieOptions };
+module.exports = { requireAuth, requireMatchingAuth, requireModerator, getCookieOptions };

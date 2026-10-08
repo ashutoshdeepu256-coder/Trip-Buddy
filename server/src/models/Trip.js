@@ -59,6 +59,7 @@ const tripSchema = new mongoose.Schema(
     transportPreference: listOfStrings,
     foodPreference: listOfStrings,
     languages: listOfStrings,
+    travelPace: { type: String, enum: ["RELAXED", "MODERATE", "FAST", null], default: null },
     privacy: {
       type: String,
       enum: ["PUBLIC", "COMMUNITY", "PRIVATE", "INVITE_ONLY"],

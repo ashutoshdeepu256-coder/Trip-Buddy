@@ -24,6 +24,7 @@ function TripCard({ trip }) {
       <div className="discovery-trip-card-body">
         <p className="discovery-trip-destination">{[destination.city || destination.name, destination.country].filter(Boolean).join(', ')}</p>
         <h2><Link to={`/trips/${trip.id}`}>{trip.title}</Link></h2>
+        {trip.compatibility && <p className="discovery-match-score">{trip.compatibility.score}% compatibility · {trip.compatibility.category.toLowerCase()}</p>}
         <p className="discovery-trip-meta">{formatDate(trip.startDate)} – {formatDate(trip.endDate)}</p>
         <div className="discovery-trip-facts">
           <span>{formatBudget(trip.budget)}</span>

@@ -21,7 +21,8 @@ Optional provider configuration and API details are documented in
 [safety API docs](./docs/api/safety.md),
 [destination discovery API docs](./docs/api/destinations.md),
 [trip API docs](./docs/api/trips.md), and
-[trip discovery API docs](./docs/api/trip-discovery.md).
+[trip discovery API docs](./docs/api/trip-discovery.md), and
+[matching API docs](./docs/api/matching.md).
 
 Destination Discovery is data-driven and ships without production destination
 records. Import an explicitly curated JSON catalog with
@@ -40,6 +41,12 @@ Discovery reads real MongoDB trips and destination/user records, excludes
 private/invite-only/draft/cancelled/full trips, and requires exact currency
 matches when a budget filter is used. `/my-trips` retains the authenticated
 trip-management page.
+
+Trip compatibility is calculated deterministically from explicit travel
+preferences. Missing preferences remain unknown, unlike explicit mismatches;
+scores are never generated or modified by an LLM. See the
+[matching architecture](./docs/architecture/matching-engine.md) for weights,
+formulas, privacy, caching, and scaling limits.
 
 ## Validation
 

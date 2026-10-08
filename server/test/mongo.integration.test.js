@@ -101,12 +101,23 @@ if (!process.env.MONGODB_TEST_URI) {
             activities: ["walking"],
             travelStyle: "slow",
             budget: "mid-range",
+            budgetRange: { min: 1000, max: 2500, currency: "INR" },
             groupPreference: "small group",
+            groupSizeRange: { min: 2, max: 5 },
+            availability: { startDate: "2027-04-01", endDate: "2027-04-15" },
+            dateFlexibilityDays: 2,
+            accommodationPreference: ["homestay"],
+            transportPreference: ["train"],
+            foodPreference: ["vegetarian"],
+            languages: ["English", "Hindi"],
+            travelPace: "MODERATE",
           },
         },
       });
       assert.equal(update.response.status, 200);
       assert.deepEqual(update.payload.data.user.profile.travelPreferences.destinations, ["Kyoto"]);
+      assert.equal(update.payload.data.user.profile.travelPreferences.budgetRange.currency, "INR");
+      assert.equal(update.payload.data.user.profile.travelPreferences.travelPace, "MODERATE");
       const publicResponse = await request("GET", `/api/v1/users/${owner.user.id}`);
       assert.equal(publicResponse.response.status, 200);
       assert.equal("email" in publicResponse.payload.data, false);

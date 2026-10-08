@@ -1,13 +1,46 @@
 const mongoose = require("mongoose");
 
+const budgetRangeSchema = new mongoose.Schema(
+  {
+    min: { type: Number, min: 0, default: null },
+    max: { type: Number, min: 0, default: null },
+    currency: { type: String, uppercase: true, trim: true, maxlength: 3, default: "USD" },
+  },
+  { _id: false },
+);
+const groupSizeRangeSchema = new mongoose.Schema(
+  {
+    min: { type: Number, min: 1, max: 100, default: null },
+    max: { type: Number, min: 1, max: 100, default: null },
+  },
+  { _id: false },
+);
+const availabilitySchema = new mongoose.Schema(
+  {
+    startDate: { type: Date, default: null },
+    endDate: { type: Date, default: null },
+  },
+  { _id: false },
+);
+
 const travelPreferencesSchema = new mongoose.Schema(
   {
     destinations: { type: [String], default: [] },
+    excludedDestinations: { type: [String], default: [] },
     interests: { type: [String], default: [] },
     activities: { type: [String], default: [] },
     travelStyle: { type: String, trim: true, maxlength: 80, default: "" },
     budget: { type: String, trim: true, maxlength: 80, default: "" },
+    budgetRange: { type: budgetRangeSchema, default: () => ({}) },
     groupPreference: { type: String, trim: true, maxlength: 80, default: "" },
+    groupSizeRange: { type: groupSizeRangeSchema, default: () => ({}) },
+    availability: { type: availabilitySchema, default: null },
+    dateFlexibilityDays: { type: Number, min: 0, max: 31, default: 0 },
+    accommodationPreference: { type: [String], default: [] },
+    transportPreference: { type: [String], default: [] },
+    foodPreference: { type: [String], default: [] },
+    languages: { type: [String], default: [] },
+    travelPace: { type: String, enum: ["RELAXED", "MODERATE", "FAST", ""], default: "" },
   },
   { _id: false },
 );
