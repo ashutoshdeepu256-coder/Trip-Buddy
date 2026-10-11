@@ -135,6 +135,16 @@ test("group-size scoring accounts for current members and never recommends a ful
   assert.ok(full.reasons.includes("This trip is full and is not recommended"));
 });
 
+test("group preference text accepts hyphen, en dash, em dash, and 'to' ranges", () => {
+  for (const groupPreference of ["4-6", "4–6", "4—6", "4 to 6"]) {
+    const result = calculateCompatibility({
+      profile: { travelPreferences: { groupPreference } },
+    }, trip);
+    assert.equal(result.breakdown.groupSize, 100, groupPreference);
+    assert.ok(result.evaluatedDimensions.includes("groupSize"), groupPreference);
+  }
+});
+
 test("food preferences distinguish vegan conflict and compatible vegetarian meals", () => {
   const conflict = calculateCompatibility(user, { ...trip, foodPreference: ["non-veg"] });
   assert.equal(conflict.preferenceBreakdown.foodPreference.score, 0);

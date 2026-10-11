@@ -233,7 +233,7 @@ const scoreSets = (name, userValues, tripValues, label) => {
 
 const parseGroupPreference = (value) => {
   if (typeof value !== "string") return null;
-  const match = value.match(/(\d{1,2})\s*(?:-|–|to)\s*(\d{1,2})/i);
+  const match = value.match(/(\d{1,2})\s*(?:[-\u2013\u2014]|to)\s*(\d{1,2})/i);
   if (!match) return null;
   const min = Number(match[1]);
   const max = Number(match[2]);
