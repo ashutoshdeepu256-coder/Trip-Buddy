@@ -111,6 +111,16 @@ test("discovery filters match any normalized value without allowing regex inject
   }
 });
 
+test("nearby trip discovery uses GeoJSON longitude-latitude and filters eligibility in geoNear", () => {
+  const filters = parse({ lat: "40.7", lng: "-73.9", radiusKm: "25" });
+  const pipeline = tripDiscovery.buildDiscoveryPipeline(filters);
+  assert.deepEqual(pipeline[0].$geoNear.near, { type: "Point", coordinates: [-73.9, 40.7] });
+  assert.equal(pipeline[0].$geoNear.maxDistance, 25000);
+  assert.equal(pipeline[0].$geoNear.key, "location");
+  assert.deepEqual(pipeline[0].$geoNear.query, { status: { $in: ["PUBLISHED", "PLANNING", "CONFIRMED"] }, privacy: "PUBLIC" });
+  assert.ok(pipeline.some((stage) => stage.$lookup?.as === "destinationDoc"));
+});
+
 test("text search uses escaped case-insensitive patterns across trip and destination fields", () => {
   const pipeline = tripDiscovery.buildDiscoveryPipeline(parse({ q: "goa.*" }));
   const search = pipeline.find((stage) => stage.$match?.$or)?.$match.$or;

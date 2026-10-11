@@ -17,6 +17,7 @@ const groupRecommendationRoutes = require("./src/routes/groupRecommendation.rout
 const connectionRoutes = require("./src/routes/connection.routes");
 const chatRoutes = require("./src/routes/chat.routes");
 const itineraryRoutes = require("./src/routes/itinerary.routes");
+const mapsRoutes = require("./src/routes/maps.routes");
 
 const app = express();
 
@@ -60,6 +61,7 @@ app.use("/api/v1/verifications", verificationRoutes);
 app.use("/api/v1/admin/verifications", adminVerificationRoutes);
 app.use("/api/v1/safety", safetyRoutes);
 app.use("/api/v1/destinations", destinationRoutes);
+app.use("/api/v1/maps", mapsRoutes);
 app.use("/api/v1", matchRoutes);
 app.use("/api/v1", groupRecommendationRoutes);
 app.use("/api/v1", connectionRoutes);

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import destinationService from '../services/destinationService'
+import MapPanel from '../components/maps/MapPanel'
 import './DestinationPages.css'
 
 const feeds = {
@@ -65,6 +66,7 @@ function DestinationDiscovery() {
   const [error, setError] = useState('')
   const [nearbyMessage, setNearbyMessage] = useState('')
   const [nearbyLocation, setNearbyLocation] = useState(null)
+  const [mappedDestination, setMappedDestination] = useState(null)
 
   const load = useCallback(async () => {
     try {
@@ -82,6 +84,7 @@ function DestinationDiscovery() {
             })
           : await feeds[feed].request(params)
       setResult(response)
+      setMappedDestination((current) => response.items.some((item) => item.id === current?.id) ? current : null)
     } catch (requestError) {
       setError(
         requestError.response?.data?.error?.message ||
@@ -228,6 +231,12 @@ function DestinationDiscovery() {
           </p>
         ) : result.items.length ? (
           <>
+            {nearbyLocation && <div className="destination-nearby-map">
+              <p className="destination-muted">Select a result to show its location. Your current coordinates are used only for this search.</p>
+              <div className="destination-map-selectors">{result.items.filter((item) => item.coordinates?.coordinates?.length === 2).map((item) => <button key={item.id} type="button" aria-pressed={mappedDestination?.id === item.id} onClick={() => setMappedDestination(item)}>{item.name}</button>)}</div>
+              {!result.items.some((item) => item.coordinates?.coordinates?.length === 2) && <p className="destination-muted">Map coordinates are unavailable for these nearby results.</p>}
+              {mappedDestination && <MapPanel key={mappedDestination.id} location={mappedDestination} title={`Nearby · ${mappedDestination.name}`} />}
+            </div>}
             <div className="destination-grid">
               {result.items.map((destination) => (
                 <DestinationCard

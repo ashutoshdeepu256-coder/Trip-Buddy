@@ -348,3 +348,10 @@
     flex-direction: column;
   }
 }
+.destination-nearby-map { margin: 0 0 24px; }
+.destination-map-selectors { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.destination-map-selectors button { border: 1px solid #334155; border-radius: 999px; padding: 8px 12px; color: #dbeafe; background: #0f1e32; }
+.destination-map-selectors button[aria-pressed="true"] { border-color: #38bdf8; background: #123852; }
+.trip-map-panel iframe, .trip-map-image { width: 100%; height: clamp(220px, 32vw, 360px); border: 0; border-radius: 1rem; object-fit: cover; }
+.trip-map-meta { display: flex; justify-content: space-between; gap: 1rem; margin-top: .75rem; font-size: .8rem; color: #94a3b8; }
+.trip-map-meta a { color: #7dd3fc; }

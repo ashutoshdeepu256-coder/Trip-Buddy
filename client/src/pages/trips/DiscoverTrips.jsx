@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import TripCard from '../../components/trip/TripCard'
+import MapPanel from '../../components/maps/MapPanel'
 import destinationService from '../../services/destinationService'
 import { useTripDiscoveryStore } from '../../store/tripDiscoveryStore'
 import { useAuthStore } from '../../store/authStore'
@@ -225,11 +226,14 @@ function DiscoverTrips() {
   const searchTrips = useTripDiscoveryStore((state) => state.searchTrips)
   const loadMore = useTripDiscoveryStore((state) => state.loadMore)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [nearby, setNearby] = useState(null)
+  const [locationMessage, setLocationMessage] = useState('')
+  const [mappedTrip, setMappedTrip] = useState(null)
   const initialParams = useMemo(() => new URLSearchParams(searchKey), [searchKey])
 
   useEffect(() => {
-    searchTrips({ page: 1, limit: 20, ...params }).catch(() => {})
-  }, [params, searchTrips])
+    searchTrips({ page: 1, limit: 20, ...params, ...(nearby || {}) }).catch(() => {})
+  }, [params, nearby, searchTrips])
 
   const applyFilters = (values) => setSearchParams(valuesToQuery(values))
   const clearFilters = () => {
@@ -237,7 +241,15 @@ function DiscoverTrips() {
     setFiltersOpen(false)
   }
   const retry = () => searchTrips({ page: 1, limit: 20, ...params }).catch(() => {})
-  const fetchNextPage = () => loadMore({ limit: 20, ...params }).catch(() => {})
+  const fetchNextPage = () => loadMore({ limit: 20, ...params, ...(nearby || {}) }).catch(() => {})
+  const findNearbyTrips = () => {
+    setLocationMessage('')
+    if (!navigator.geolocation) return setLocationMessage('Location search is not supported by this browser.')
+    navigator.geolocation.getCurrentPosition(({ coords }) => {
+      setNearby({ lat: coords.latitude, lng: coords.longitude, radiusKm: 100 })
+      setLocationMessage('Showing public and community trips within 100 km. Your coordinates are used only for this search.')
+    }, () => setLocationMessage('Location permission was not granted. You can still search trips by destination.'), { timeout: 10000 })
+  }
 
   return (
     <main className="trip-shell discovery-shell">
@@ -250,6 +262,9 @@ function DiscoverTrips() {
           values.q = query
           applyFilters(values)
         }} />
+        <button className="secondary-btn trip-location-search" type="button" onClick={findNearbyTrips}>Use my location for nearby trips</button>
+        {nearby && <button className="secondary-btn trip-location-search" type="button" onClick={() => { setNearby(null); setLocationMessage('Nearby search cleared.') }}>Clear nearby search</button>}
+        {locationMessage && <p className="discovery-footnote" role="status">{locationMessage}</p>}
       </section>
       <div className="discovery-toolbar">
         <button className="secondary-btn discovery-open-filters" type="button" onClick={() => setFiltersOpen(true)}>Filters</button>
@@ -270,9 +285,14 @@ function DiscoverTrips() {
         <section className="discovery-results" aria-label="Trip search results" aria-busy={loading}>
           {error && <div className="discovery-error" role="alert"><p>{error}</p><button className="secondary-btn" onClick={retry}>Try again</button></div>}
           {pagination.truncated && <p className="discovery-footnote">Compatibility is ranked across the {pagination.candidateLimit} most recent eligible trips matching these filters.</p>}
+          {results.some((trip) => trip.destination?.coordinates?.coordinates?.length === 2) && <div className="trip-nearby-map">
+            <p className="discovery-footnote">Map markers show published destination locations, not private trip meeting points.</p>
+            <div className="destination-map-selectors">{results.filter((trip) => trip.destination?.coordinates?.coordinates?.length === 2).map((trip) => <button type="button" key={trip.id} aria-pressed={mappedTrip?.id === trip.id} onClick={() => setMappedTrip(trip)}>{trip.destination.name}</button>)}</div>
+            {results.some((trip) => trip.id === mappedTrip?.id) && mappedTrip?.destination?.coordinates && <MapPanel key={mappedTrip.id} location={mappedTrip.destination} title={`Destination · ${mappedTrip.destination.name}`} />}
+          </div>}
           {loading ? <div className="discovery-trip-grid">{[0, 1, 2, 3, 4, 5].map((item) => <TripCardSkeleton key={item} />)}</div>
             : results.length ? <>
-              <div className="discovery-trip-grid">{results.map((trip) => <TripCard key={trip.id} trip={trip} />)}</div>
+              <div className="discovery-trip-grid">{results.map((trip) => <article className="trip-map-result" key={trip.id}><TripCard trip={trip} />{Number.isFinite(trip.distanceKm) && <p className="discovery-footnote">About {trip.distanceKm} km away · straight-line distance</p>}</article>)}</div>
               {pagination.hasNextPage && <button className="secondary-btn discovery-load-more" type="button" onClick={fetchNextPage} disabled={loadingMore}>{loadingMore ? 'Loading more trips…' : 'Load more trips'}</button>}
             </> : !error && <div className="trip-empty-state discovery-empty">
               <h2>No trips match these filters yet</h2><p>Try another destination, widen your dates, increase your budget flexibility, or remove a filter.</p>

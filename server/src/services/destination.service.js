@@ -122,9 +122,7 @@ const listNearby = async ({ lat, lng, radiusKm, page = 1, limit = 12 }) => {
       },
     },
   };
-  const key = cacheKey("nearby", { lat, lng, radiusKm, page, limit });
-  const cached = cache.get(key);
-  if (cached !== undefined) return cached;
+  // Do not retain or cache a caller's precise browser location in process memory.
   const [items, total] = await Promise.all([
     Destination.find(query)
       .skip((page - 1) * limit)
@@ -139,10 +137,10 @@ const listNearby = async ({ lat, lng, radiusKm, page = 1, limit = 12 }) => {
       },
     }),
   ]);
-  return cache.set(key, {
+  return {
     items: items.map(formatDestination),
     pagination: pagination(page, limit, total),
-  });
+  };
 };
 
 const listAdventure = async (options = {}) =>

@@ -7,6 +7,7 @@ import CompatibilityScore from '../../components/matching/CompatibilityScore'
 import GroupFormationPanel from '../../components/matching/GroupFormationPanel'
 import ConnectionRequestButton from '../../components/connections/ConnectionRequestButton'
 import chatService from '../../services/chatService'
+import MapPanel from '../../components/maps/MapPanel'
 import '../TripPages.css'
 
 const nextStatus = {
@@ -181,6 +182,9 @@ function TripDetails() {
               {trip.destination.images?.[0]?.url && <img className="trip-destination-image" src={trip.destination.images[0].url} alt={trip.destination.images[0].alt || trip.destination.name} />}
             </> : <p>Destination not selected.</p>}
           </section>
+          {(trip.isOwner || trip.isMember) && trip.location
+            ? <MapPanel location={trip} title="Trip location" />
+            : trip.destination?.coordinates && <MapPanel location={trip.destination} title="Destination map" />}
           <section className="trip-panel">
             <h2>Trip creator</h2>
             <p className="trip-creator-name">{trip.creator?.name || 'TripBuddy traveler'}</p>

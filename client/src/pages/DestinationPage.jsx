@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import destinationService from '../services/destinationService'
-import { getMapPresentation } from '../services/mapProviders'
+import MapPanel from '../components/maps/MapPanel'
 import './DestinationPages.css'
 
 const formatMonths = (months = []) =>
@@ -51,7 +51,6 @@ function DestinationPage() {
       </main>
     )
 
-  const map = getMapPresentation(destination)
   const hero = destination.heroImage || destination.images?.[0]
   const budget = destination.estimatedBudget
 
@@ -211,43 +210,7 @@ function DestinationPage() {
                 </p>
               ))}
           </section>
-          <section className="destination-panel">
-            <h2>Map</h2>
-            {map ? (
-              <>
-                {map.kind === 'image' ? (
-                  <img
-                    className="destination-map"
-                    src={map.url}
-                    alt={`Map of ${destination.name} provided by ${map.provider}`}
-                  />
-                ) : (
-                  <iframe
-                    className="destination-map"
-                    title={`Map of ${destination.name}`}
-                    src={map.url}
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
-                )}
-                <a
-                  className="destination-map-link"
-                  href={map.directionsUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open map and directions ↗
-                </a>
-                <small className="destination-muted">
-                  Map by {map.provider}
-                </small>
-              </>
-            ) : (
-              <p className="destination-muted">
-                Map coordinates are not available for this destination.
-              </p>
-            )}
-          </section>
+          <MapPanel location={destination} title={`Map · ${destination.name}`} className="destination-panel" />
         </aside>
       </div>
     </main>

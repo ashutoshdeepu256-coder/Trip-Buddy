@@ -1,4 +1,5 @@
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 const controller = require("../controllers/destination.controller");
 const validate = require("../middleware/validate");
 const { asyncHandler } = require("../utils/http");
@@ -8,6 +9,7 @@ const {
 } = require("../validators/destination");
 
 const router = express.Router();
+const nearbyLimiter = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false, handler: require("../utils/http").rateLimitHandler });
 
 router.get(
   "/",
@@ -26,6 +28,7 @@ router.get(
 );
 router.get(
   "/nearby",
+  nearbyLimiter,
   validate(nearbyQuerySchema, "query"),
   asyncHandler(controller.nearby),
 );

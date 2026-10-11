@@ -28,6 +28,9 @@ const optionalDate = z.preprocess(
 
 const discoveryQuerySchema = z.object({
   destination: z.string().trim().min(1).max(140).optional(),
+  lat: optionalNumber(-90, 90),
+  lng: optionalNumber(-180, 180),
+  radiusKm: optionalNumber(1, 500),
   q: z.string().trim().min(1).max(100).optional(),
   startDate: optionalDate,
   endDate: optionalDate,
@@ -70,6 +73,12 @@ const discoveryQuerySchema = z.object({
     .default("recent"),
 }).strict().superRefine((query, context) => {
   const hasDate = query.startDate !== undefined || query.endDate !== undefined;
+  if ((query.lat === undefined) !== (query.lng === undefined)) {
+    context.addIssue({ code: "custom", path: [query.lat === undefined ? "lat" : "lng"], message: "Provide both lat and lng" });
+  }
+  if (query.radiusKm !== undefined && query.lat === undefined) {
+    context.addIssue({ code: "custom", path: ["radiusKm"], message: "radiusKm requires lat and lng" });
+  }
   if (hasDate && (!query.startDate || !query.endDate)) {
     context.addIssue({ code: "custom", path: ["endDate"], message: "Provide both startDate and endDate" });
   }

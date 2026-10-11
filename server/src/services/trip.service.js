@@ -31,7 +31,7 @@ const allowedUpdateFields = [
 const idString = (value) => value?._id?.toString?.() || value?.toString?.() || null;
 const isOwner = (trip, userId) => idString(trip.creator) === idString(userId);
 
-const serializeTrip = (trip) => {
+const serializeTrip = (trip, { includeLocation = false } = {}) => {
   const value = trip.toObject ? trip.toObject() : trip;
   const creator = value.creator;
   const destination = value.destination;
@@ -85,7 +85,9 @@ const serializeTrip = (trip) => {
     privacy: value.privacy,
     status: value.status,
     images: (value.images || []).map(({ url, format, uploadedAt }) => ({ url, format, uploadedAt })),
-    location: value.location,
+    // Trip coordinates can reveal lodging or meeting places; expose them only
+    // to the trip owner and current active members.
+    location: includeLocation ? value.location : null,
     publishedAt: value.publishedAt,
     cancelledAt: value.cancelledAt,
     completedAt: value.completedAt,
@@ -150,7 +152,7 @@ const createTrip = async (user, values) => {
     await Trip.deleteOne({ _id: trip._id });
     throw error;
   }
-  return serializeTrip(trip);
+  return serializeTrip(trip, { includeLocation: true });
 };
 
 const getAccessibleTrip = async (tripId, user = null) => {
@@ -158,9 +160,10 @@ const getAccessibleTrip = async (tripId, user = null) => {
   const owner = user && isOwner(trip, user._id);
   const member = user && await hasMembership(trip._id, user._id);
   if (owner || member) {
-    const serialized = serializeTrip(trip);
+    const activeMember = Boolean(owner || await hasActiveMembership(trip._id, user._id));
+    const serialized = serializeTrip(trip, { includeLocation: activeMember });
     serialized.isOwner = Boolean(owner);
-    serialized.isMember = Boolean(owner || await hasActiveMembership(trip._id, user._id));
+    serialized.isMember = activeMember;
     return serialized;
   }
   if (trip.status === "DRAFT" || trip.status === "CANCELLED") {
@@ -253,7 +256,7 @@ const cancelTrip = async (tripId, user) => {
   trip.status = "CANCELLED";
   trip.cancelledAt = new Date();
   await trip.save();
-  return serializeTrip(trip);
+  return serializeTrip(trip, { includeLocation: true });
 };
 
 const transitions = {
@@ -280,7 +283,7 @@ const changeTripStatus = async (tripId, user, status) => {
   trip.status = status;
   if (status === "COMPLETED") trip.completedAt = now;
   await trip.save();
-  return serializeTrip(trip);
+  return serializeTrip(trip, { includeLocation: true });
 };
 
 const getMyTrips = async (user, { page = 1, limit = 12, status } = {}) => {

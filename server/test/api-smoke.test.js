@@ -78,6 +78,24 @@ test("nearby destination search requires valid coordinates", async () => {
   assert.equal(payload.error.code, "VALIDATION_ERROR");
 });
 
+test("maps API reports capabilities and returns a labeled straight-line distance", async () => {
+  const capabilities = await request("GET", "/api/v1/maps/capabilities");
+  assert.equal(capabilities.response.status, 200);
+  assert.equal(capabilities.payload.data.mapRendering, "client");
+  assert.equal(capabilities.payload.data.nearbyPlaces, false);
+  const distance = await request("POST", "/api/v1/maps/distance", {
+    from: { lat: 0, lng: 0 }, to: { lat: 0, lng: 1 },
+  });
+  assert.equal(distance.response.status, 200);
+  assert.equal(distance.payload.data.distanceKm, 111.2);
+  assert.equal(distance.payload.data.method, "great-circle");
+  assert.equal("durationSeconds" in distance.payload.data, false);
+  const invalid = await request("POST", "/api/v1/maps/distance", {
+    from: { lat: 91, lng: 0 }, to: { lat: 0, lng: 1 },
+  });
+  assert.equal(invalid.response.status, 400);
+});
+
 test("destination listing endpoint is public and returns validated pagination", async (context) => {
   context.mock.method(destinationService, "listDestinations", async (options) => {
     assert.equal(options.page, 2);

@@ -3,8 +3,8 @@ const mapboxToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN
 const preferredProvider = import.meta.env.VITE_MAP_PROVIDER
 
 export function getMapPresentation(destination) {
-  const [longitude, latitude] = destination.coordinates?.coordinates || []
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null
+  const [longitude, latitude] = destination.coordinates?.coordinates || destination.location?.coordinates || []
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return null
 
   const provider =
     destination.mapProvider && destination.mapProvider !== 'NONE'
@@ -15,9 +15,9 @@ export function getMapPresentation(destination) {
   googleUrl.searchParams.set('query', `${latitude},${longitude}`)
 
   if (provider === 'GOOGLE_MAPS' && googleMapsKey) {
-    const embedUrl = new URL('https://www.google.com/maps/embed/v1/view')
+    const embedUrl = new URL('https://www.google.com/maps/embed/v1/place')
     embedUrl.searchParams.set('key', googleMapsKey)
-    embedUrl.searchParams.set('center', `${latitude},${longitude}`)
+    embedUrl.searchParams.set('q', `${latitude},${longitude}`)
     embedUrl.searchParams.set('zoom', '11')
     return {
       kind: 'embed',
@@ -41,7 +41,7 @@ export function getMapPresentation(destination) {
   }
 
   const delta = 0.04
-  const bbox = `${longitude - delta},${latitude - delta},${longitude + delta},${latitude + delta}`
+  const bbox = `${Math.max(-180, longitude - delta)},${Math.max(-90, latitude - delta)},${Math.min(180, longitude + delta)},${Math.min(90, latitude + delta)}`
   const openStreetMapUrl = new URL(
     'https://www.openstreetmap.org/export/embed.html',
   )
@@ -52,5 +52,6 @@ export function getMapPresentation(destination) {
     provider: 'OpenStreetMap',
     url: openStreetMapUrl.toString(),
     directionsUrl: googleUrl.toString(),
+    attribution: '© OpenStreetMap contributors',
   }
 }

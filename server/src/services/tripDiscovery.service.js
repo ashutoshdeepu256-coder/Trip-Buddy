@@ -27,7 +27,7 @@ const lookupStages = [
       let: { destinationId: "$destination" },
       pipeline: [
         { $match: { $expr: { $and: [{ $eq: ["$_id", "$$destinationId"] }, { $eq: ["$published", true] }] } } },
-        { $project: { name: 1, slug: 1, country: 1, state: 1, city: 1, images: { $slice: ["$images", 1] } } },
+        { $project: { name: 1, slug: 1, country: 1, state: 1, city: 1, coordinates: 1, images: { $slice: ["$images", 1] } } },
       ],
       as: "destinationDoc",
     },
@@ -112,7 +112,18 @@ const buildDiscoveryPipeline = (filters, user = null, destinationIds = null) => 
     }
   }
 
-  const pipeline = [{ $match: match }, ...lookupStages];
+  const pipeline = filters.lat !== undefined
+    ? [{
+        $geoNear: {
+          near: { type: "Point", coordinates: [filters.lng, filters.lat] },
+          distanceField: "distanceMeters",
+          maxDistance: (filters.radiusKm || 100) * 1000,
+          spherical: true,
+          key: "location",
+          query: match,
+        },
+      }, ...lookupStages]
+    : [{ $match: match }, ...lookupStages];
   if (filters.q) {
     const pattern = new RegExp(escapeRegex(filters.q), "i");
     pipeline.push({
@@ -166,6 +177,7 @@ const safeCard = (trip) => {
       country: trip.destinationDoc.country,
       state: trip.destinationDoc.state,
       city: trip.destinationDoc.city,
+      coordinates: trip.destinationDoc.coordinates || null,
     },
     startDate: trip.startDate,
     endDate: trip.endDate,
@@ -195,6 +207,7 @@ const safeCard = (trip) => {
     privacy: trip.privacy,
     status: trip.status,
     createdAt: trip.createdAt,
+    ...(Number.isFinite(trip.distanceMeters) ? { distanceKm: Math.round((trip.distanceMeters / 1000) * 10) / 10 } : {}),
   };
 };
 
@@ -208,7 +221,8 @@ const discoverTrips = async (filters, user = null) => {
     }
     const destinationIds = await resolveDestinationIds(filters.destination);
     const pipeline = buildDiscoveryPipeline(filters, user, destinationIds);
-    pipeline[0].$match.creator = { $ne: user._id };
+    const eligibilityMatch = pipeline.find((stage) => stage.$match)?.$match || pipeline[0].$geoNear.query;
+    eligibilityMatch.creator = { $ne: user._id };
     pipeline.push(
       { $sort: { createdAt: -1, _id: -1 } },
       { $limit: COMPATIBILITY_CANDIDATE_LIMIT + 1 },
@@ -234,6 +248,7 @@ const discoverTrips = async (filters, user = null) => {
           updatedAt: 1,
           currentMembers: 1,
           availableSlots: 1,
+          distanceMeters: 1,
           creatorDoc: 1,
           destinationDoc: 1,
           images: { $slice: ["$images", 1] },
@@ -290,7 +305,7 @@ const discoverTrips = async (filters, user = null) => {
   pipeline.push({
     $facet: {
       items: [
-        { $sort: sortOptions[filters.sort] },
+        { $sort: filters.lat !== undefined ? { distanceMeters: 1, _id: 1 } : sortOptions[filters.sort] },
         { $skip: (page - 1) * limit },
         { $limit: limit },
         {
@@ -313,6 +328,7 @@ const discoverTrips = async (filters, user = null) => {
             createdAt: 1,
             currentMembers: 1,
             availableSlots: 1,
+            distanceMeters: 1,
             creatorDoc: 1,
             destinationDoc: 1,
             images: { $slice: ["$images", 1] },

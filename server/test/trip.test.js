@@ -57,6 +57,18 @@ test("trip model links users and destinations and indexes discovery/matching que
   await assert.rejects(invalidLocation.validate(), { name: "ValidationError" });
 });
 
+test("trip serialization hides stored coordinates unless the caller is authorized", () => {
+  const record = {
+    _id: new mongoose.Types.ObjectId(),
+    creator: ownerId,
+    title: "Private pickup point",
+    location: { type: "Point", coordinates: [12.4, 45.1] },
+    toObject() { return { ...this, toObject: undefined }; },
+  };
+  assert.equal(tripService.serializeTrip(record).location, null);
+  assert.deepEqual(tripService.serializeTrip(record, { includeLocation: true }).location, record.location);
+});
+
 test("draft validation permits incomplete fields but strips client-controlled lifecycle status", () => {
   const draft = createTripSchema.parse({ title: "Draft", status: "PUBLISHED" });
   assert.equal(draft.title, "Draft");

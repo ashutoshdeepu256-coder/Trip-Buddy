@@ -20,7 +20,7 @@ const listingQuerySchema = z.object({
 const nearbyQuerySchema = z.object({
   lat: z.coerce.number().min(-90).max(90),
   lng: z.coerce.number().min(-180).max(180),
-  radiusKm: z.coerce.number().min(1).max(20000).default(100),
+  radiusKm: z.coerce.number().finite().min(1).max(500).default(100),
   page: positiveInteger(1, 10000),
   limit: positiveInteger(12, 50),
 });
