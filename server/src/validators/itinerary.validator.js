@@ -7,6 +7,7 @@ const costSchema = z.object({
   currency: z.string().regex(/^[A-Z]{3}$/),
 }).strict();
 const activitySchema = z.object({
+  id: objectId.optional(),
   title: shortText(120),
   description: z.string().trim().max(500).default(""),
   durationMinutes: z.number().int().min(15).max(720),
@@ -17,8 +18,10 @@ const sectionSchema = z.object({
   activities: z.array(activitySchema).max(5),
 }).strict();
 const daySchema = z.object({
+  id: objectId.optional(),
   day: z.number().int().min(1).max(31),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  title: z.string().trim().max(120).optional(),
   morning: sectionSchema,
   afternoon: sectionSchema,
   evening: sectionSchema,
@@ -67,4 +70,23 @@ const updateSchema = z.object({
 const dayParamsSchema = z.object({ itineraryId: objectId, day: z.coerce.number().int().min(1).max(31), section: z.enum(["morning", "afternoon", "evening"]).optional() });
 const dayUpdateSchema = z.object({ day: daySchema }).strict();
 
-module.exports = { generateSchema, idParamsSchema, listQuerySchema, updateSchema, dayParamsSchema, dayUpdateSchema, planSchema, daySchema };
+const revisionSchema = z.object({ expectedRevision: z.number().int().min(1) }).strict();
+const collaborationPolicySchema = z.object({ enabled: z.boolean(), expectedRevision: z.number().int().min(1) }).strict();
+const collaboratorSchema = z.object({ userId: objectId, role: z.enum(["VIEWER", "EDITOR"]), expectedRevision: z.number().int().min(1) }).strict();
+const revokeCollaboratorSchema = z.object({ userId: objectId, expectedRevision: z.number().int().min(1) }).strict();
+const editActivitySchema = z.object({
+  expectedRevision: z.number().int().min(1),
+  dayId: objectId,
+  section: z.enum(["morning", "afternoon", "evening"]),
+  activity: activitySchema,
+}).strict();
+const reorderSchema = z.object({ expectedRevision: z.number().int().min(1), dayId: objectId, section: z.enum(["morning", "afternoon", "evening"]), activityIds: z.array(objectId).max(15) }).strict();
+const deleteActivitySchema = z.object({ expectedRevision: z.number().int().min(1), dayId: objectId, section: z.enum(["morning", "afternoon", "evening"]) }).strict();
+const dayOrderSchema = z.object({ expectedRevision: z.number().int().min(1), dayIds: z.array(objectId).min(1).max(31) }).strict();
+const addDaySchema = z.object({ expectedRevision: z.number().int().min(1) }).strict();
+const updateDaySchema = z.object({ expectedRevision: z.number().int().min(1), dayId: objectId, title: z.string().trim().min(1).max(120) }).strict();
+const deleteDaySchema = z.object({ expectedRevision: z.number().int().min(1), dayId: objectId }).strict();
+const historyQuerySchema = z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(50).default(20) });
+const restoreSchema = z.object({ expectedRevision: z.number().int().min(1), revision: z.number().int().min(1) }).strict();
+
+module.exports = { generateSchema, idParamsSchema, listQuerySchema, updateSchema, dayParamsSchema, dayUpdateSchema, planSchema, daySchema, revisionSchema, collaborationPolicySchema, collaboratorSchema, revokeCollaboratorSchema, editActivitySchema, reorderSchema, deleteActivitySchema, dayOrderSchema, addDaySchema, updateDaySchema, deleteDaySchema, historyQuerySchema, restoreSchema };

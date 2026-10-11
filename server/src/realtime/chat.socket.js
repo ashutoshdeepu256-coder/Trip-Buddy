@@ -4,6 +4,9 @@ const User = require("../models/User");
 const Message = require("../models/Message");
 const chatService = require("../services/chat.service");
 const { socketMessageSchema, socketConversationSchema, socketReadSchema, typingSchema } = require("../validators/chat.validator");
+const collaboration = require("../services/collaborativeItinerary.service");
+const { z } = require("zod");
+const collabValidators = require("../validators/itinerary.validator");
 
 const userRoom = (id) => `user:${id}`;
 const rateWindows = new Map();
@@ -167,6 +170,61 @@ const createChatSocket = (httpServer, app) => {
       }
       return { conversationId: data.conversationId, active: data.active };
     }));
+    const itineraryIdSchema = z.object({ itineraryId: z.string().regex(/^[a-f\d]{24}$/i) }).strict();
+    const itineraryRoom = (id) => `itinerary:${id}`;
+    const collabRequest = (actor) => ({
+      user: actor,
+      ip: socket.handshake.address,
+      get: (name) => socket.handshake.headers[name.toLowerCase()],
+    });
+    const emitItineraryChange = async (itineraryId, event) => {
+      const sockets = await io.in(itineraryRoom(itineraryId)).fetchSockets();
+      for (const recipient of sockets) {
+        try {
+          const actor = await refreshSocketActor(recipient);
+          await collaboration.authorizeSocket(itineraryId, actor._id);
+          recipient.emit("itinerary:changed", event);
+        } catch {
+          await recipient.leave(itineraryRoom(itineraryId));
+        }
+      }
+    };
+    const runItineraryWrite = (eventName, validator, operation, write = true) => {
+      socket.on(eventName, (payload, ack) => ackRun(socket, ack, async () => {
+        const actor = await refreshSocketActor(socket);
+        const raw = { ...payload };
+        const { itineraryId, activityId, ...values } = raw;
+        const identity = itineraryIdSchema.parse({ itineraryId });
+        await collaboration.authorizeSocket(identity.itineraryId, actor._id, write);
+        const data = validator.parse(values);
+        const request = collabRequest(actor);
+        const result = await operation(request, identity.itineraryId, data, activityId || data.dayId);
+        const event = { itineraryId: identity.itineraryId, revision: result.revision, operation: eventName, actorId: actor._id.toString() };
+        if (!result.duplicate) await emitItineraryChange(identity.itineraryId, event);
+        return { ...event, duplicate: Boolean(result.duplicate) };
+      }));
+    };
+    socket.on("itinerary:join", (payload, ack) => ackRun(socket, ack, async () => {
+      await refreshSocketActor(socket);
+      const { itineraryId } = itineraryIdSchema.parse(payload);
+      await collaboration.authorizeSocket(itineraryId, socket.data.userId);
+      await socket.join(itineraryRoom(itineraryId));
+      return { itineraryId, joined: true };
+    }));
+    socket.on("itinerary:leave", (payload, ack) => ackRun(socket, ack, async () => {
+      await refreshSocketActor(socket);
+      const { itineraryId } = itineraryIdSchema.parse(payload);
+      await socket.leave(itineraryRoom(itineraryId));
+      return { itineraryId, left: true };
+    }));
+    runItineraryWrite("itinerary:activity:add", collabValidators.editActivitySchema, (req, id, data) => collaboration.addActivity(req, id, data));
+    runItineraryWrite("itinerary:activity:update", collabValidators.editActivitySchema, (req, id, data, activityId) => collaboration.updateActivity(req, id, activityId, data));
+    runItineraryWrite("itinerary:activity:remove", collabValidators.deleteActivitySchema, (req, id, data, activityId) => collaboration.removeActivity(req, id, activityId, data));
+    runItineraryWrite("itinerary:activities:reorder", collabValidators.reorderSchema, (req, id, data) => collaboration.reorderActivities(req, id, data));
+    runItineraryWrite("itinerary:days:reorder", collabValidators.dayOrderSchema, (req, id, data) => collaboration.reorderDays(req, id, data));
+    runItineraryWrite("itinerary:day:add", collabValidators.addDaySchema, (req, id, data) => collaboration.addDay(req, id, data));
+    runItineraryWrite("itinerary:day:update", collabValidators.updateDaySchema, (req, id, data, dayId) => collaboration.updateDay(req, id, dayId, data));
+    runItineraryWrite("itinerary:day:remove", collabValidators.deleteDaySchema, (req, id, data, dayId) => collaboration.removeDay(req, id, dayId, data));
     socket.on("disconnect", () => {
       // Presence is not persisted; disconnecting removes this socket from all rooms.
     });

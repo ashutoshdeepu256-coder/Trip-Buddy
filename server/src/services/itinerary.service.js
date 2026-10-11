@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const Itinerary = require("../models/Itinerary");
 const Trip = require("../models/Trip");
+const TripMember = require("../models/TripMember");
 const Destination = require("../models/Destination");
 const { HttpError } = require("../utils/http");
 const { recordAudit } = require("./audit.service");
@@ -109,6 +110,8 @@ const safeSerialize = (record) => {
   return {
     id: idOf(value),
     tripId: idOf(value.trip) || null,
+    collaborationEnabled: Boolean(value.collaborationEnabled),
+    revision: value.revision || 1,
     title: value.title,
     destination: value.destination,
     startDate: value.startDate,
@@ -136,6 +139,9 @@ const ownedItinerary = async (id, actor, { includeArchived = true } = {}) => {
   if (!includeArchived) query.archivedAt = null;
   const record = await Itinerary.findOne(query);
   if (!record) throw new HttpError(404, "Itinerary was not found", "ITINERARY_NOT_FOUND");
+  if (record.trip && record.collaborationEnabled) {
+    await require("./collaborativeItinerary.service").authorizeSocket(record._id, actor._id);
+  }
   return record;
 };
 const assertOwnedTrip = async (tripId, actor) => {
@@ -202,17 +208,34 @@ const generate = async (req, values) => {
 
 const list = async (actor, query) => {
   ensureActive(actor);
-  const filter = { owner: actor._id, archivedAt: query.archived === "true" ? { $ne: null } : null };
+  const memberships = await TripMember.find({ user: actor._id, status: "ACTIVE" }).select("trip").lean();
+  const tripIds = memberships.map((entry) => entry.trip);
+  const creatorTrips = tripIds.length ? await Trip.find({ _id: { $in: tripIds }, creator: actor._id }).select("_id").lean() : [];
+  const ownedTripIds = creatorTrips.map((trip) => trip._id);
+  const archivedAt = query.archived === "true" ? { $ne: null } : null;
+  const filter = { owner: actor._id, archivedAt, $or: [
+    { collaborationEnabled: { $ne: true } },
+    { collaborationEnabled: true, trip: { $in: tripIds }, $or: [{ "collaborators.user": actor._id }, { trip: { $in: ownedTripIds } }] },
+  ] };
   const [items, total] = await Promise.all([
     Itinerary.find(filter).sort({ updatedAt: -1, _id: -1 }).skip((query.page - 1) * query.limit).limit(query.limit),
     Itinerary.countDocuments(filter),
   ]);
-  return { items: items.map(safeSerialize), page: query.page, limit: query.limit, total, totalPages: Math.ceil(total / query.limit), hasNextPage: query.page * query.limit < total, hasPreviousPage: query.page > 1 };
+  const accessible = [];
+  for (const record of items) {
+    if (record.collaborationEnabled) {
+      try { await require("./collaborativeItinerary.service").authorizeSocket(record._id, actor._id); }
+      catch { continue; }
+    }
+    accessible.push(record);
+  }
+  return { items: accessible.map(safeSerialize), page: query.page, limit: query.limit, total, totalPages: Math.ceil(total / query.limit), hasNextPage: query.page * query.limit < total, hasPreviousPage: query.page > 1 };
 };
 const get = async (actor, id) => safeSerialize(await ownedItinerary(id, actor));
 const update = async (req, id, values) => {
   ensureActive(req.user);
   const record = await ownedItinerary(id, req.user, { includeArchived: false });
+  if (record.collaborationEnabled) throw new HttpError(409, "Use revision-aware collaboration editing for this shared itinerary", "COLLABORATIVE_EDIT_ENDPOINT_REQUIRED");
   if (values.title !== undefined) record.title = values.title;
   if (values.budget) record.budget = { ...values.budget, currency: values.budget.currency.toUpperCase() };
   if (values.preferences) record.preferences = values.preferences;
@@ -230,6 +253,7 @@ const update = async (req, id, values) => {
 const regenerateDay = async (req, id, dayNumber, section = null) => {
   ensureActive(req.user);
   const record = await ownedItinerary(id, req.user, { includeArchived: false });
+  if (record.collaborationEnabled) throw new HttpError(409, "Use revision-aware collaboration editing for this shared itinerary", "COLLABORATIVE_EDIT_ENDPOINT_REQUIRED");
   if (dayNumber > record.plan.days.length) throw new HttpError(404, "Itinerary day was not found", "ITINERARY_DAY_NOT_FOUND");
   const input = {
     destination: record.destination,
@@ -264,6 +288,7 @@ const duplicate = async (req, id) => {
 const archive = async (req, id) => {
   ensureActive(req.user);
   const record = await ownedItinerary(id, req.user);
+  if (record.collaborationEnabled) throw new HttpError(409, "Disable collaboration before archiving this itinerary", "COLLABORATIVE_EDIT_ENDPOINT_REQUIRED");
   record.archivedAt = record.archivedAt || new Date();
   await record.save();
   await recordEvent(req, "ITINERARY_ARCHIVED", record._id);
@@ -272,6 +297,7 @@ const archive = async (req, id) => {
 const remove = async (req, id) => {
   ensureActive(req.user);
   const record = await ownedItinerary(id, req.user);
+  if (record.collaborationEnabled) throw new HttpError(409, "Disable collaboration before deleting this itinerary", "COLLABORATIVE_EDIT_ENDPOINT_REQUIRED");
   await Itinerary.deleteOne({ _id: record._id, owner: req.user._id });
   await recordEvent(req, "ITINERARY_DELETED", record._id);
   return { id: record._id.toString(), deleted: true };

@@ -102,7 +102,7 @@ app.use((error, _req, res, _next) => {
   }
   res.status(statusCode).json({
     success: false,
-    error: { code, message },
+    error: { code, message, ...(error.details ? { details: error.details } : {}) },
   });
 });
 
