@@ -92,6 +92,7 @@ const serializeTrip = (trip) => {
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     isOwner: false,
+    isMember: false,
   };
 };
 
@@ -130,6 +131,9 @@ const hasMembership = async (tripId, userId) =>
     status: { $in: ["PENDING", "ACTIVE"] },
   }));
 
+const hasActiveMembership = async (tripId, userId) =>
+  Boolean(await TripMember.exists({ trip: tripId, user: userId, status: "ACTIVE" }));
+
 const createTrip = async (user, values) => {
   const data = updateFields(values);
   if (data.destination) data.destination = await validateDestination(data.destination);
@@ -156,6 +160,7 @@ const getAccessibleTrip = async (tripId, user = null) => {
   if (owner || member) {
     const serialized = serializeTrip(trip);
     serialized.isOwner = Boolean(owner);
+    serialized.isMember = Boolean(owner || await hasActiveMembership(trip._id, user._id));
     return serialized;
   }
   if (trip.status === "DRAFT" || trip.status === "CANCELLED") {

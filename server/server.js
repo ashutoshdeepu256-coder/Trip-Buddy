@@ -11,6 +11,7 @@ require("dotenv").config();
 const http = require("http");
 const app = require("./app");
 const connectDB = require("./src/config/db");
+const { createChatSocket } = require("./src/realtime/chat.socket");
 
 const PORT = process.env.PORT || 5000;
 
@@ -22,6 +23,7 @@ const startServer = async () => {
     await connectDB();
 
     const server = http.createServer(app);
+    createChatSocket(server, app);
 
     server.listen(PORT, () => {
       console.log(`🚀 TripBuddy API running on http://localhost:${PORT}`);

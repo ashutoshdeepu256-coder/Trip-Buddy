@@ -23,6 +23,8 @@ const auditLogSchema = new mongoose.Schema(
         "CONNECTION_REJECTED",
         "CONNECTION_CANCELLED",
         "CONNECTION_UNMATCHED",
+        "CHAT_CONVERSATION_CREATED",
+        "CHAT_MESSAGE_SENT",
         "ADMIN_ACTION",
       ],
       required: true,

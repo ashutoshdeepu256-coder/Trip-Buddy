@@ -23,6 +23,9 @@ Optional provider configuration and API details are documented in
 [trip API docs](./docs/api/trips.md), and
 [trip discovery API docs](./docs/api/trip-discovery.md), and
 [matching API docs](./docs/api/matching.md).
+Chat REST and Socket.IO contracts, authorization, and single-instance scaling
+limits are documented in [chat API docs](./docs/api/chat.md) and the
+[real-time architecture](./docs/architecture/realtime-communication.md).
 
 Destination Discovery is data-driven and ships without production destination
 records. Import an explicitly curated JSON catalog with

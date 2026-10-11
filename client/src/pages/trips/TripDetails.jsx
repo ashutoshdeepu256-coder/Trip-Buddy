@@ -6,6 +6,7 @@ import matchingService from '../../services/matchingService'
 import CompatibilityScore from '../../components/matching/CompatibilityScore'
 import GroupFormationPanel from '../../components/matching/GroupFormationPanel'
 import ConnectionRequestButton from '../../components/connections/ConnectionRequestButton'
+import chatService from '../../services/chatService'
 import '../TripPages.css'
 
 const nextStatus = {
@@ -36,12 +37,26 @@ function TripDetails() {
   const deleteTrip = useTripStore((state) => state.deleteTrip)
   const [matchingData, setMatchingData] = useState(null)
   const [refreshingMatch, setRefreshingMatch] = useState(false)
+  const [openingChat, setOpeningChat] = useState(false)
+  const [chatError, setChatError] = useState('')
   const matchingKey = user && trip ? `${tripId}:${user.id}:${user.updatedAt || ''}` : null
   const matchingLoading = Boolean(matchingKey && matchingData?.key !== matchingKey)
   const compatibility = matchingData?.key === matchingKey ? matchingData.result : null
   const matchingError = matchingData?.key === matchingKey ? matchingData.error : ''
   const groupFormationAvailable = ['PUBLISHED', 'PLANNING', 'CONFIRMED'].includes(trip?.status)
     && ['PUBLIC', 'COMMUNITY'].includes(trip?.privacy)
+  const tripChatAvailable = ['PUBLISHED', 'PLANNING', 'CONFIRMED', 'ONGOING'].includes(trip?.status)
+
+  const openTripChat = async () => {
+    setOpeningChat(true)
+    setChatError('')
+    try {
+      const conversation = await chatService.trip(tripId)
+      navigate(`/chat?conversation=${encodeURIComponent(conversation.id)}`)
+    } catch (requestError) {
+      setChatError(requestError.response?.data?.error?.message || 'Trip chat is unavailable for your current membership.')
+    } finally { setOpeningChat(false) }
+  }
 
   useEffect(() => {
     fetchTrip(tripId).catch(() => {})
@@ -139,7 +154,10 @@ function TripDetails() {
             <p><strong>Food preferences</strong><span>{formatList(trip.foodPreference)}</span></p>
             <p><strong>Travel pace</strong><span>{pretty(trip.travelPace)}</span></p>
           </section>
-          <section className="trip-panel"><h2>Plan together</h2><p>Compatibility and consent-based group recommendations are available for this trip.</p><div className="trip-future-grid"><span>Matching · active</span><span>Group recommendations · active</span><span>Connections · later phase</span><span>Chat · later phase</span></div></section>
+          <section className="trip-panel"><h2>Plan together</h2><p>Compatibility and consent-based group recommendations are available for this trip.</p><div className="trip-future-grid"><span>Matching · active</span><span>Group recommendations · active</span><span>Connections · active</span><span>Trip chat · active members</span></div>
+            {user && tripChatAvailable && (trip.isOwner || trip.isMember) && <button type="button" className="primary-btn" disabled={openingChat} onClick={openTripChat}>{openingChat ? 'Opening chat…' : 'Open trip chat'}</button>}
+            {chatError && <p className="form-error" role="alert">{chatError}</p>}
+          </section>
           {trip.isOwner
             ? user && (groupFormationAvailable
               ? <GroupFormationPanel trip={trip} user={user} />
