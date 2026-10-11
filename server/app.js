@@ -16,6 +16,7 @@ const matchRoutes = require("./src/routes/match.routes");
 const groupRecommendationRoutes = require("./src/routes/groupRecommendation.routes");
 const connectionRoutes = require("./src/routes/connection.routes");
 const chatRoutes = require("./src/routes/chat.routes");
+const itineraryRoutes = require("./src/routes/itinerary.routes");
 
 const app = express();
 
@@ -63,6 +64,7 @@ app.use("/api/v1", matchRoutes);
 app.use("/api/v1", groupRecommendationRoutes);
 app.use("/api/v1", connectionRoutes);
 app.use("/api/v1/chat", chatRoutes);
+app.use("/api/v1/itineraries", itineraryRoutes);
 app.use("/api/v1", tripDiscoveryRoutes);
 app.use("/api/v1", tripRoutes);
 

@@ -25,11 +25,15 @@ if (!process.env.MONGODB_TEST_URI) {
   const Trip = require("../src/models/Trip");
   const TripMember = require("../src/models/TripMember");
   const Connection = require("../src/models/Connection");
+  const Itinerary = require("../src/models/Itinerary");
 
   test("MongoDB-backed Phase 4/5 and Phase 6 workflows", async (context) => {
+    let databaseName = "";
+    try { databaseName = new URL(process.env.MONGODB_TEST_URI).pathname.replace(/^\//, "").split("/")[0]; } catch { /* Mongoose reports malformed URIs. */ }
+    assert.match(databaseName, /test/i, "MONGODB_TEST_URI must name a dedicated test database");
     await mongoose.connect(process.env.MONGODB_TEST_URI, { serverSelectionTimeoutMS: 3000 });
     await Promise.all(
-      [User, Verification, EmailVerificationToken, AuditLog, Block, Report, Destination, Trip, TripMember, Connection].map((model) =>
+      [User, Verification, EmailVerificationToken, AuditLog, Block, Report, Destination, Trip, TripMember, Connection, Itinerary].map((model) =>
         model.init(),
       ),
     );
@@ -764,6 +768,41 @@ if (!process.env.MONGODB_TEST_URI) {
       assert.equal(staleSession.response.status, 401);
       const user = await User.findById(owner.user.id).select("+tokenVersion");
       assert.equal(user.tokenVersion, 1);
+    });
+
+    await context.test("itinerary generation persists owner-private plans with a safe fallback", async () => {
+      delete process.env.GEMINI_API_KEY;
+      delete process.env.GEMINI_MODEL;
+      const created = await request("POST", "/api/v1/itineraries/generate", {
+        cookie: owner.cookie,
+        body: { destination: "Lisbon", startDate: "2027-05-01", endDate: "2027-05-02", budget: { amount: 500, currency: "EUR" } },
+      });
+      assert.equal(created.response.status, 201);
+      assert.equal(created.payload.data.source, "DETERMINISTIC_FALLBACK");
+      assert.equal(created.payload.data.plan.days.length, 2);
+      assert.equal(created.payload.data.plan.days[0].morning.activities[0].estimatedCost.amount, null);
+      const privateRead = await request("GET", `/api/v1/itineraries/${created.payload.data.id}`, { cookie: other.cookie });
+      assert.equal(privateRead.response.status, 404);
+      const ownRead = await request("GET", `/api/v1/itineraries/${created.payload.data.id}`, { cookie: owner.cookie });
+      assert.equal(ownRead.response.status, 200);
+      const changed = await request("PATCH", `/api/v1/itineraries/${created.payload.data.id}`, { cookie: owner.cookie, body: { title: "Saved Lisbon plan" } });
+      assert.equal(changed.response.status, 200);
+      assert.equal(changed.payload.data.title, "Saved Lisbon plan");
+      const listing = await request("GET", "/api/v1/itineraries", { cookie: owner.cookie });
+      assert.equal(listing.payload.data.total, 1);
+
+      const destination = await Destination.create({ name: "Planner Test City", slug: `planner-test-${Date.now()}`, country: "Testland", description: "Test destination only." });
+      const trip = await Trip.create({ creator: owner.user.id, destination: destination._id, title: "Private test trip", startDate: new Date("2027-06-01T00:00:00Z"), endDate: new Date("2027-06-02T00:00:00Z"), status: "PLANNING" });
+      await TripMember.create([
+        { trip: trip._id, user: owner.user.id, role: "OWNER", status: "ACTIVE", joinedAt: new Date() },
+        { trip: trip._id, user: other.user.id, role: "MEMBER", status: "ACTIVE", joinedAt: new Date() },
+      ]);
+      const linked = await request("POST", "/api/v1/itineraries/generate", { cookie: owner.cookie, body: { tripId: trip._id.toString() } });
+      assert.equal(linked.response.status, 201);
+      const memberAttempt = await request("POST", "/api/v1/itineraries/generate", { cookie: other.cookie, body: { tripId: trip._id.toString() } });
+      assert.equal(memberAttempt.response.status, 404, "membership does not permit linking a private plan");
+      const linkedPlanAccess = await request("GET", `/api/v1/itineraries/${linked.payload.data.id}`, { cookie: other.cookie });
+      assert.equal(linkedPlanAccess.response.status, 404, "trip membership does not share the creator's plan");
     });
   });
 }

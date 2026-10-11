@@ -17,6 +17,7 @@ import MyTrips from './pages/trips/MyTrips'
 import DiscoverTrips from './pages/trips/DiscoverTrips'
 import ConnectionsPage from './pages/connections/ConnectionsPage'
 import ChatPage from './pages/ChatPage'
+import ItineraryPlanner from './pages/ItineraryPlanner'
 
 const facts = [
   { label: 'Travel style', value: 'Your pace' },
@@ -77,6 +78,7 @@ function App() {
             <Link to="/my-trips">My trips</Link>
             <Link to="/connections">Connections</Link>
             <Link to="/chat">Messages</Link>
+            <Link to="/planner">Planner</Link>
             <Link to="/profile" className="text-link">My profile</Link>
             <button type="button" className="secondary-btn nav-action" onClick={logout}>
               Sign out
@@ -208,6 +210,7 @@ function App() {
       <Route path="/connections/requests" element={<ProtectedRoute><ConnectionsPage /></ProtectedRoute>} />
       <Route path="/connections/sent" element={<ProtectedRoute><ConnectionsPage /></ProtectedRoute>} />
       <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+      <Route path="/planner" element={<ProtectedRoute><ItineraryPlanner /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

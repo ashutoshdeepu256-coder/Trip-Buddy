@@ -123,6 +123,7 @@ function TripDetails() {
       <div className="trip-detail-heading">
         <div><Link className="trip-back" to={owner ? '/my-trips' : '/trips'}>← {owner ? 'My trips' : 'Discover trips'}</Link><span className={`trip-status status-${trip.status.toLowerCase()}`}>{pretty(trip.status)}</span><h1>{trip.title || 'Untitled trip draft'}</h1><p>{trip.destination?.name ? `${trip.destination.name}${trip.destination.country ? `, ${trip.destination.country}` : ''}` : 'Choose a destination'}</p></div>
         {owner && <div className="trip-detail-actions">
+          {!['CANCELLED', 'COMPLETED'].includes(trip.status) && <Link className="secondary-btn" to={`/planner?tripId=${encodeURIComponent(trip.id)}`}>Build itinerary</Link>}
           {trip.status === 'DRAFT' && <Link className="secondary-btn" to={`/trips/${trip.id}/edit`}>Edit draft</Link>}
           {trip.status === 'DRAFT' && <button className="primary-btn" type="button" disabled={saving} onClick={() => action(publishTrip)}>Publish trip</button>}
           {nextStatus[trip.status] && <button className="secondary-btn" type="button" disabled={saving} onClick={() => action((id) => changeTripStatus(id, nextStatus[trip.status]))}>Move to {pretty(nextStatus[trip.status])}</button>}
