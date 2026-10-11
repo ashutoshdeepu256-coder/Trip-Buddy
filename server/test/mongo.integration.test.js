@@ -24,11 +24,12 @@ if (!process.env.MONGODB_TEST_URI) {
   const Destination = require("../src/models/Destination");
   const Trip = require("../src/models/Trip");
   const TripMember = require("../src/models/TripMember");
+  const Connection = require("../src/models/Connection");
 
   test("MongoDB-backed Phase 4/5 and Phase 6 workflows", async (context) => {
     await mongoose.connect(process.env.MONGODB_TEST_URI, { serverSelectionTimeoutMS: 3000 });
     await Promise.all(
-      [User, Verification, EmailVerificationToken, AuditLog, Block, Report, Destination, Trip, TripMember].map((model) =>
+      [User, Verification, EmailVerificationToken, AuditLog, Block, Report, Destination, Trip, TripMember, Connection].map((model) =>
         model.init(),
       ),
     );
@@ -74,6 +75,80 @@ if (!process.env.MONGODB_TEST_URI) {
 
     const owner = await register("owner@tripbuddy.test", "Owner Traveler");
     const other = await register("other@tripbuddy.test", "Other Traveler");
+
+    await context.test("connection lifecycle enforces authorization, privacy, idempotency and reconnection policy", async () => {
+      const unauthenticated = await request("POST", "/api/v1/connections", { body: { recipientId: other.user.id } });
+      assert.equal(unauthenticated.response.status, 401);
+      const self = await request("POST", "/api/v1/connections", { cookie: owner.cookie, body: { recipientId: owner.user.id } });
+      assert.equal(self.response.status, 400);
+
+      const created = await request("POST", "/api/v1/connections", {
+        cookie: owner.cookie,
+        body: { recipientId: other.user.id, score: 100 },
+      });
+      assert.equal(created.response.status, 400, "client-supplied scores are rejected by strict validation");
+      const sent = await request("POST", "/api/v1/connections", { cookie: owner.cookie, body: { recipientId: other.user.id } });
+      assert.equal(sent.response.status, 201);
+      const connectionId = sent.payload.data.connection.id;
+      const reverseDuplicate = await request("POST", "/api/v1/connections", { cookie: other.cookie, body: { recipientId: owner.user.id } });
+      assert.equal(reverseDuplicate.response.status, 409);
+
+      const incoming = await request("GET", "/api/v1/connections/requests/received", { cookie: other.cookie });
+      const outgoing = await request("GET", "/api/v1/connections/requests/sent", { cookie: owner.cookie });
+      assert.equal(incoming.payload.data.items[0].id, connectionId);
+      assert.equal(outgoing.payload.data.items[0].id, connectionId);
+      assert.equal("email" in incoming.payload.data.items[0].otherUser, false);
+
+      const wrongAccept = await request("POST", `/api/v1/connections/${connectionId}/accept`, { cookie: owner.cookie });
+      assert.equal(wrongAccept.response.status, 404);
+      const wrongReject = await request("POST", `/api/v1/connections/${connectionId}/reject`, { cookie: owner.cookie });
+      assert.equal(wrongReject.response.status, 404);
+      const concurrentAccepts = await Promise.all([
+        request("POST", `/api/v1/connections/${connectionId}/accept`, { cookie: other.cookie }),
+        request("POST", `/api/v1/connections/${connectionId}/accept`, { cookie: other.cookie }),
+      ]);
+      assert.deepEqual(concurrentAccepts.map(({ response }) => response.status).sort(), [200, 409]);
+      const bothLists = await Promise.all([
+        request("GET", "/api/v1/connections", { cookie: owner.cookie }),
+        request("GET", "/api/v1/connections", { cookie: other.cookie }),
+      ]);
+      assert.equal(bothLists[0].payload.data.items.length, 1);
+      assert.equal(bothLists[1].payload.data.items.length, 1);
+      const third = await register("third@tripbuddy.test", "Third Traveler");
+      const hidden = await request("GET", `/api/v1/connections/${connectionId}`, { cookie: third.cookie });
+      assert.equal(hidden.response.status, 404);
+      const details = await request("GET", `/api/v1/connections/${connectionId}`, { cookie: owner.cookie });
+      assert.equal(details.response.status, 200);
+      assert.equal("email" in details.payload.data.connection.otherUser, false);
+      const unmatched = await request("POST", `/api/v1/connections/${connectionId}/unmatch`, { cookie: owner.cookie });
+      assert.equal(unmatched.response.status, 200);
+      const invalidReaccept = await request("POST", `/api/v1/connections/${connectionId}/accept`, { cookie: other.cookie });
+      assert.equal(invalidReaccept.response.status, 409);
+      const reconnect = await request("POST", "/api/v1/connections", { cookie: owner.cookie, body: { recipientId: other.user.id } });
+      assert.equal(reconnect.response.status, 201, "unmatched users can initiate a new request");
+      const cancelledByRecipient = await request("POST", `/api/v1/connections/${reconnect.payload.data.connection.id}/cancel`, { cookie: other.cookie });
+      assert.equal(cancelledByRecipient.response.status, 404);
+      const cancelled = await request("POST", `/api/v1/connections/${reconnect.payload.data.connection.id}/cancel`, { cookie: owner.cookie });
+      assert.equal(cancelled.response.status, 200);
+
+      await User.updateOne({ _id: other.user.id }, { $set: { accountStatus: "SUSPENDED" } });
+      const restricted = await request("POST", "/api/v1/connections", { cookie: owner.cookie, body: { recipientId: other.user.id } });
+      assert.equal(restricted.response.status, 404);
+      await User.updateOne({ _id: other.user.id }, { $set: { accountStatus: "ACTIVE" } });
+
+      const blocked = await request("POST", `/api/v1/safety/block/${other.user.id}`, { cookie: owner.cookie, body: {} });
+      assert.equal(blocked.response.status, 200);
+      const blockedRequest = await request("POST", "/api/v1/connections", { cookie: other.cookie, body: { recipientId: owner.user.id } });
+      assert.equal(blockedRequest.response.status, 404);
+      await request("DELETE", `/api/v1/safety/block/${other.user.id}`, { cookie: owner.cookie });
+
+      const rejectedRequest = await request("POST", "/api/v1/connections", { cookie: owner.cookie, body: { recipientId: third.user.id } });
+      assert.equal(rejectedRequest.response.status, 201);
+      const rejected = await request("POST", `/api/v1/connections/${rejectedRequest.payload.data.connection.id}/reject`, { cookie: third.cookie });
+      assert.equal(rejected.response.status, 200);
+      const freshAfterRejection = await request("POST", "/api/v1/connections", { cookie: owner.cookie, body: { recipientId: third.user.id } });
+      assert.equal(freshAfterRejection.response.status, 201);
+    });
 
     await context.test("register/login, cookie session, and current user persist safely", async () => {
       assert.equal(owner.user.email, "owner@tripbuddy.test");

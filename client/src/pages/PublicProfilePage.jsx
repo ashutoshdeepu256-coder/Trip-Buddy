@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import api from '../services/api'
 import { TrustBadge } from './ProfilePage'
+import { useAuthStore } from '../store/authStore'
+import ConnectionRequestButton from '../components/connections/ConnectionRequestButton'
 
 function PublicProfilePage() {
   const { userId } = useParams()
   const [profile, setProfile] = useState(null)
   const [error, setError] = useState('')
+  const currentUser = useAuthStore((state) => state.user)
 
   useEffect(() => {
     let active = true
@@ -32,6 +35,9 @@ function PublicProfilePage() {
           <div><span className="eyebrow">Traveler</span><h1>{profile.name}</h1></div>
         </div>
         <p className="profile-bio">{profile.profile?.bio || 'This traveler has not added a bio yet.'}</p>
+        {currentUser && currentUser.id !== userId
+          ? <ConnectionRequestButton recipientId={userId} />
+          : !currentUser && <Link className="primary-btn" to="/login">Sign in to connect</Link>}
         <section className="trust-summary">
           <h2>Verified signals</h2>
           <TrustBadge verified={profile.trust.emailVerified} label="Email verified" />

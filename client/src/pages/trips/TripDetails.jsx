@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/authStore'
 import matchingService from '../../services/matchingService'
 import CompatibilityScore from '../../components/matching/CompatibilityScore'
 import GroupFormationPanel from '../../components/matching/GroupFormationPanel'
+import ConnectionRequestButton from '../../components/connections/ConnectionRequestButton'
 import '../TripPages.css'
 
 const nextStatus = {
@@ -164,6 +165,8 @@ function TripDetails() {
           <section className="trip-panel">
             <h2>Trip creator</h2>
             <p className="trip-creator-name">{trip.creator?.name || 'TripBuddy traveler'}</p>
+            {user && !owner && trip.creator?.id && <ConnectionRequestButton recipientId={trip.creator.id} tripId={trip.id} />}
+            {!user && !authLoading && <Link className="primary-btn" to="/login">Sign in to connect with the creator</Link>}
             {trip.creator?.location && <p>{trip.creator.location}</p>}
             {trip.creator?.joinedAt && <p>Member since {new Date(trip.creator.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</p>}
           </section>

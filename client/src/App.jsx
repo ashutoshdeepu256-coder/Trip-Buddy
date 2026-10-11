@@ -15,6 +15,7 @@ import EditTrip from './pages/trips/EditTrip'
 import TripDetails from './pages/trips/TripDetails'
 import MyTrips from './pages/trips/MyTrips'
 import DiscoverTrips from './pages/trips/DiscoverTrips'
+import ConnectionsPage from './pages/connections/ConnectionsPage'
 
 const facts = [
   { label: 'Travel style', value: 'Your pace' },
@@ -73,6 +74,7 @@ function App() {
           <div className="topbar-actions">
             <Link to="/trips">Discover trips</Link>
             <Link to="/my-trips">My trips</Link>
+            <Link to="/connections">Connections</Link>
             <Link to="/profile" className="text-link">My profile</Link>
             <button type="button" className="secondary-btn nav-action" onClick={logout}>
               Sign out
@@ -200,6 +202,9 @@ function App() {
       <Route path="/verification" element={<ProtectedRoute><VerificationCenter /></ProtectedRoute>} />
       <Route path="/verification/identity" element={<ProtectedRoute><IdentityVerification /></ProtectedRoute>} />
       <Route path="/users/:userId" element={<PublicProfilePage />} />
+      <Route path="/connections" element={<ProtectedRoute><ConnectionsPage /></ProtectedRoute>} />
+      <Route path="/connections/requests" element={<ProtectedRoute><ConnectionsPage /></ProtectedRoute>} />
+      <Route path="/connections/sent" element={<ProtectedRoute><ConnectionsPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

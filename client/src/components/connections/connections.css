@@ -1,0 +1,11 @@
+.connections-page { max-width: 920px; margin: 0 auto; padding: 2rem 1rem; }
+.connections-page > header { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; margin-bottom: 2rem; }
+.connections-page > header nav, .connection-actions { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; }
+.connections-page > header nav { margin-left: auto; }
+.connection-list { display: grid; gap: 1rem; }
+.connection-card { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; padding: 1.25rem; border: 1px solid #dce3ef; border-radius: 1rem; background: white; }
+.connection-card h2 { margin: 0 0 .4rem; font-size: 1.1rem; }
+.connection-card p { margin: .25rem 0; }
+.connection-request-action { display: inline-grid; gap: .5rem; }
+.connection-request-action p { margin: 0; font-size: .9rem; }
+@media (max-width: 600px) { .connection-card { align-items: flex-start; flex-direction: column; } .connections-page > header nav { margin-left: 0; } }
