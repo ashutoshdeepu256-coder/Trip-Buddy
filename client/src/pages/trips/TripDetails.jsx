@@ -4,6 +4,7 @@ import { useTripStore } from '../../store/tripStore'
 import { useAuthStore } from '../../store/authStore'
 import matchingService from '../../services/matchingService'
 import CompatibilityScore from '../../components/matching/CompatibilityScore'
+import GroupFormationPanel from '../../components/matching/GroupFormationPanel'
 import '../TripPages.css'
 
 const nextStatus = {
@@ -38,6 +39,8 @@ function TripDetails() {
   const matchingLoading = Boolean(matchingKey && matchingData?.key !== matchingKey)
   const compatibility = matchingData?.key === matchingKey ? matchingData.result : null
   const matchingError = matchingData?.key === matchingKey ? matchingData.error : ''
+  const groupFormationAvailable = ['PUBLISHED', 'PLANNING', 'CONFIRMED'].includes(trip?.status)
+    && ['PUBLIC', 'COMMUNITY'].includes(trip?.privacy)
 
   useEffect(() => {
     fetchTrip(tripId).catch(() => {})
@@ -135,16 +138,21 @@ function TripDetails() {
             <p><strong>Food preferences</strong><span>{formatList(trip.foodPreference)}</span></p>
             <p><strong>Travel pace</strong><span>{pretty(trip.travelPace)}</span></p>
           </section>
-          <section className="trip-panel"><h2>Plan together</h2><p>Trip discovery and matching, connections, group planning, and chat will connect here in later phases.</p><div className="trip-future-grid"><span>Matching · planned</span><span>Connections · planned</span><span>Group · planned</span><span>Chat · planned</span></div></section>
+          <section className="trip-panel"><h2>Plan together</h2><p>Compatibility and consent-based group recommendations are available for this trip.</p><div className="trip-future-grid"><span>Matching · active</span><span>Group recommendations · active</span><span>Connections · later phase</span><span>Chat · later phase</span></div></section>
           {trip.isOwner
-            ? <section className="trip-panel"><h2>Traveler matching</h2><p>Compatibility is private to each traveler. You can manage this trip here; traveler discovery will be added in a later phase.</p></section>
+            ? user && (groupFormationAvailable
+              ? <GroupFormationPanel trip={trip} user={user} />
+              : <section className="trip-panel"><h2>Group recommendations</h2><p>This trip is not currently eligible for group recommendations.</p></section>)
             : !user && !authLoading
               ? <section className="trip-panel"><h2>Travel compatibility</h2><p>Sign in to see how this trip aligns with your travel preferences.</p><Link className="primary-btn" to="/login">Sign in to check compatibility</Link></section>
-              : user && <section className="trip-panel">
-                {matchingLoading && <p role="status">Calculating your travel compatibility…</p>}
-                {matchingError && <p className="form-error" role="alert">{matchingError}</p>}
-                <CompatibilityScore compatibility={compatibility} onRefresh={refreshCompatibility} refreshing={refreshingMatch} />
-              </section>}
+              : user && <>
+                <section className="trip-panel">
+                  {matchingLoading && <p role="status">Calculating your travel compatibility…</p>}
+                  {matchingError && <p className="form-error" role="alert">{matchingError}</p>}
+                  <CompatibilityScore compatibility={compatibility} onRefresh={refreshCompatibility} refreshing={refreshingMatch} />
+                </section>
+                {groupFormationAvailable && <GroupFormationPanel trip={trip} user={user} />}
+              </>}
         </div>
         <aside className="trip-detail-side">
           <section className="trip-panel"><h2>Destination</h2>

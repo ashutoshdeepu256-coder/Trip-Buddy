@@ -13,6 +13,7 @@ const destinationRoutes = require("./src/routes/destination.routes");
 const tripRoutes = require("./src/routes/trip.routes");
 const tripDiscoveryRoutes = require("./src/routes/tripDiscovery.routes");
 const matchRoutes = require("./src/routes/match.routes");
+const groupRecommendationRoutes = require("./src/routes/groupRecommendation.routes");
 
 const app = express();
 
@@ -57,6 +58,7 @@ app.use("/api/v1/admin/verifications", adminVerificationRoutes);
 app.use("/api/v1/safety", safetyRoutes);
 app.use("/api/v1/destinations", destinationRoutes);
 app.use("/api/v1", matchRoutes);
+app.use("/api/v1", groupRecommendationRoutes);
 app.use("/api/v1", tripDiscoveryRoutes);
 app.use("/api/v1", tripRoutes);
 

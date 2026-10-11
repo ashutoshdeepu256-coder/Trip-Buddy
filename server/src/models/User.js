@@ -48,6 +48,12 @@ const travelPreferencesSchema = new mongoose.Schema(
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, minlength: 2, maxlength: 80 },
+    accountStatus: {
+      type: String,
+      enum: ["ACTIVE", "SUSPENDED", "BANNED"],
+      default: "ACTIVE",
+      index: true,
+    },
     email: {
       type: String,
       required: true,
