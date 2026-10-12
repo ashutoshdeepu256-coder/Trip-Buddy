@@ -19,6 +19,7 @@ import ConnectionsPage from './pages/connections/ConnectionsPage'
 import ChatPage from './pages/ChatPage'
 import ItineraryPlanner from './pages/ItineraryPlanner'
 import BookingsPage from './pages/BookingsPage'
+import TripExpenses from './pages/trips/TripExpenses'
 
 const facts = [
   { label: 'Travel style', value: 'Your pace' },
@@ -202,6 +203,7 @@ function App() {
       <Route path="/trips/create" element={<ProtectedRoute><CreateTrip /></ProtectedRoute>} />
       <Route path="/trips/:tripId/edit" element={<ProtectedRoute><EditTrip /></ProtectedRoute>} />
       <Route path="/trips/:tripId" element={<TripDetails />} />
+      <Route path="/trips/:tripId/expenses" element={<ProtectedRoute><TripExpenses /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       <Route path="/profile/edit" element={<ProtectedRoute><ProfilePage edit /></ProtectedRoute>} />
       <Route path="/profile/travel-preferences" element={<ProtectedRoute><ProfilePage edit travelPreferences /></ProtectedRoute>} />

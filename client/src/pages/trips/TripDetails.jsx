@@ -137,6 +137,7 @@ function TripDetails() {
           }}>Delete draft</button>}
         </div>}
       </div>
+      {user && (trip.isOwner || trip.isMember) && <Link className="secondary-btn" to={`/trips/${encodeURIComponent(trip.id)}/expenses`}>Open shared expense ledger</Link>}
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="trip-gallery">
         {trip.images?.length ? trip.images.map((image, index) => <img key={`${image.url}-${index}`} src={image.url} alt={`${trip.title || 'Trip'} photo ${index + 1}`} />) : <div className="trip-gallery-placeholder"><span>Trip photos</span><small>Images will appear here when added by the creator.</small></div>}

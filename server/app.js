@@ -19,6 +19,7 @@ const chatRoutes = require("./src/routes/chat.routes");
 const itineraryRoutes = require("./src/routes/itinerary.routes");
 const mapsRoutes = require("./src/routes/maps.routes");
 const bookingRoutes = require("./src/routes/booking.routes");
+const expenseRoutes = require("./src/routes/expense.routes");
 
 const app = express();
 
@@ -69,6 +70,7 @@ app.use("/api/v1", connectionRoutes);
 app.use("/api/v1/chat", chatRoutes);
 app.use("/api/v1/itineraries", itineraryRoutes);
 app.use("/api/v1/bookings", bookingRoutes);
+app.use("/api/v1/expenses", expenseRoutes);
 app.use("/api/v1", tripDiscoveryRoutes);
 app.use("/api/v1", tripRoutes);
 
