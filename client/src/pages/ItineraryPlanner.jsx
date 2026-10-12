@@ -231,6 +231,7 @@ function ItineraryPlanner() {
               {selected.collaborationEnabled && <div className="itinerary-history"><h3>Recent changes</h3>{history.map((entry) => <p key={entry.revision}>Revision {entry.revision} · {entry.actor.name} · {entry.operation.replaceAll('_', ' ').toLowerCase()}</p>)}</div>}
             </section>}
             <div className="itinerary-plan-heading">
+              {!selected.shared && <Link to={`/bookings?${selected.tripId ? `tripId=${encodeURIComponent(selected.tripId)}&` : ''}itineraryId=${encodeURIComponent(selected.id)}`}>View private booking records</Link>}
               <div><span className={selected.source === 'GEMINI' ? 'itinerary-source' : 'itinerary-source fallback'}>{selected.source === 'GEMINI' ? 'AI draft' : 'Template draft'}</span><h2>{selected.title}</h2><p>{selected.destination} · {new Date(selected.startDate).toLocaleDateString()} – {new Date(selected.endDate).toLocaleDateString()}</p></div>
               <div className="itinerary-actions">{!selected.shared && <><button type="button" onClick={saveTitle} disabled={saving}>Rename</button><button type="button" onClick={() => run(() => itineraryService.duplicate(selected.id))} disabled={saving}>Duplicate</button><button type="button" onClick={() => run(() => itineraryService.archive(selected.id), true)} disabled={saving}>Archive</button><button type="button" onClick={remove} disabled={saving}>Delete</button></>}</div>
             </div>

@@ -1,0 +1,22 @@
+const express = require("express");
+const rateLimit = require("express-rate-limit");
+const { z } = require("zod");
+const { requireAuth } = require("../middleware/auth");
+const validate = require("../middleware/validate");
+const { asyncHandler, rateLimitHandler } = require("../utils/http");
+const controller = require("../controllers/booking.controller");
+const { idParamsSchema, listQuerySchema, categoryQuerySchema, createSchema, updateSchema } = require("../validators/booking.validator");
+
+const routes = express.Router();
+const perUserKey = (req) => req.user._id.toString();
+const writeLimiter = rateLimit({ windowMs: 60_000, limit: 20, keyGenerator: perUserKey, standardHeaders: true, legacyHeaders: false, handler: rateLimitHandler });
+routes.use(requireAuth);
+routes.get("/categories", asyncHandler(controller.categories));
+routes.get("/services", validate(categoryQuerySchema, "query"), asyncHandler(controller.services));
+routes.get("/services/:serviceId", validate(z.object({ serviceId: z.enum(["accommodation-search", "transport-search", "activity-search"]) }), "params"), asyncHandler(controller.serviceDetail));
+routes.post("/", writeLimiter, validate(createSchema), asyncHandler(controller.create));
+routes.get("/", validate(listQuerySchema, "query"), asyncHandler(controller.list));
+routes.get("/:bookingId", validate(idParamsSchema, "params"), asyncHandler(controller.get));
+routes.patch("/:bookingId", writeLimiter, validate(idParamsSchema, "params"), validate(updateSchema), asyncHandler(controller.update));
+routes.post("/:bookingId/cancel", writeLimiter, validate(idParamsSchema, "params"), asyncHandler(controller.cancel));
+module.exports = routes;

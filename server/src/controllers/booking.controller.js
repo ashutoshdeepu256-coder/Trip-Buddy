@@ -1,0 +1,11 @@
+const { sendSuccess } = require("../utils/http");
+const service = require("../services/booking.service");
+const categories = (_req, res) => sendSuccess(res, service.categories());
+const services = (req, res) => sendSuccess(res, service.services(req.validatedQuery.category));
+const serviceDetail = (req, res) => sendSuccess(res, service.service(req.params.serviceId));
+const create = async (req, res) => { const result = await service.create(req, req.body); return sendSuccess(res, result, result.duplicate ? "Existing booking record returned" : "Booking record created", result.duplicate ? 200 : 201); };
+const list = async (req, res) => sendSuccess(res, await service.list(req.user, req.validatedQuery));
+const get = async (req, res) => sendSuccess(res, await service.get(req.user, req.params.bookingId));
+const update = async (req, res) => sendSuccess(res, await service.update(req, req.params.bookingId, req.body), "Booking note updated");
+const cancel = async (req, res) => sendSuccess(res, await service.cancel(req, req.params.bookingId), "Booking record cancelled");
+module.exports = { categories, services, serviceDetail, create, list, get, update, cancel };
