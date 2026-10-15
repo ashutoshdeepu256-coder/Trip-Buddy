@@ -20,10 +20,21 @@ const itineraryRoutes = require("./src/routes/itinerary.routes");
 const mapsRoutes = require("./src/routes/maps.routes");
 const bookingRoutes = require("./src/routes/booking.routes");
 const expenseRoutes = require("./src/routes/expense.routes");
+const paymentRoutes = require("./src/routes/payment.routes");
 
 const app = express();
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      "script-src": ["'self'", "https://checkout.razorpay.com"],
+      "frame-src": ["'self'", "https://api.razorpay.com", "https://*.razorpay.com"],
+      "connect-src": ["'self'", "https://api.razorpay.com", "https://*.razorpay.com"],
+      "form-action": ["'self'", "https://api.razorpay.com", "https://*.razorpay.com"],
+    },
+  },
+}));
 
 app.use(
   cors({
@@ -32,6 +43,8 @@ app.use(
   })
 );
 
+// Razorpay signs exact bytes; consume its webhook before any JSON body parser.
+app.use("/api/v1/payments/webhooks/razorpay", express.raw({ type: "application/json", limit: "64kb" }), paymentRoutes.webhookRoutes);
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -71,6 +84,7 @@ app.use("/api/v1/chat", chatRoutes);
 app.use("/api/v1/itineraries", itineraryRoutes);
 app.use("/api/v1/bookings", bookingRoutes);
 app.use("/api/v1/expenses", expenseRoutes);
+app.use("/api/v1/payments", paymentRoutes.routes);
 app.use("/api/v1", tripDiscoveryRoutes);
 app.use("/api/v1", tripRoutes);
 

@@ -8,6 +8,7 @@ const AuditLog = require("../models/AuditLog");
 const { HttpError } = require("../utils/http");
 const { calculateAllocations } = require("./expenseSplit.service");
 const { buildLedger, suggestSettlements } = require("./expenseLedger.service");
+const paymentProvider = require("./paymentProvider.service");
 
 const idOf = (value) => value?._id?.toString?.() || value?.toString?.() || "";
 const eligibleTripStatuses = ["PUBLISHED", "PLANNING", "CONFIRMED", "ONGOING", "COMPLETED"];
@@ -52,9 +53,12 @@ const assertTripAccess = async (tripId, actor) => assertActiveMember(tripId, act
 const activeParticipants = async (tripId, session) => {
   const memberships = await TripMember.find({ trip: tripId, status: "ACTIVE", $or: [{ joinedAt: null }, { joinedAt: { $lte: new Date() } }] }).select("user").session(session).lean();
   const ids = memberships.map((membership) => membership.user);
-  const users = await User.find({ _id: { $in: ids }, accountStatus: { $in: ["ACTIVE", null] } }).select("name").session(session).lean();
-  const byId = new Map(users.map((user) => [idOf(user._id), user.name]));
-  return memberships.map(({ user }) => ({ userId: idOf(user), name: byId.get(idOf(user)) })).filter((member) => member.name).sort((left, right) => left.userId.localeCompare(right.userId));
+  const users = await User.find({ _id: { $in: ids }, accountStatus: { $in: ["ACTIVE", null] } }).select("name +razorpayLinkedAccountId").session(session).lean();
+  const byId = new Map(users.map((user) => [idOf(user._id), user]));
+  return memberships.map(({ user }) => {
+    const profile = byId.get(idOf(user));
+    return profile ? { userId: idOf(user), name: profile.name, paymentAvailable: Boolean(paymentProvider.isConfigured() && paymentProvider.configuration().routeEnabled && profile.razorpayLinkedAccountId) } : null;
+  }).filter(Boolean).sort((left, right) => left.userId.localeCompare(right.userId));
 };
 
 const audit = async (req, session, { action, resourceType, resourceId, tripId }) => {
@@ -114,6 +118,7 @@ const serializeSettlement = (settlement) => {
     to: { userId: idOf(value.toUser), name: value.toNameAtCreation },
     amountMinorUnits: value.amountMinorUnits, currency: value.currency,
     note: value.note, status: value.status, recordedBy: idOf(value.recordedBy),
+    source: value.source || "USER_REPORTED", paymentId: idOf(value.paymentAttempt),
     recordedAt: value.recordedAt, reversedBy: idOf(value.reversedBy), reversedAt: value.reversedAt,
     reversalReason: value.reversalReason, createdAt: value.createdAt,
   };
@@ -274,6 +279,7 @@ const reverseSettlement = async (req, tripId, settlementId, { reason }) => withL
   const settlement = await ExpenseSettlement.findOne({ _id: settlementId, trip: tripId }).session(session);
   if (!settlement) throw new HttpError(404, "Settlement record was not found", "SETTLEMENT_NOT_FOUND");
   if (idOf(settlement.recordedBy) !== idOf(req.user._id)) throw new HttpError(403, "Only the reporting member can reverse this settlement", "SETTLEMENT_REVERSE_FORBIDDEN");
+  if (settlement.source === "PROVIDER_VERIFIED") throw new HttpError(409, "Provider-verified settlements can only be reversed after a verified provider refund", "PROVIDER_SETTLEMENT_REFUND_REQUIRED");
   if (settlement.status === "REVERSED") return { changed: false, result: serializeSettlement(settlement) };
   settlement.status = "REVERSED";
   settlement.reversedBy = req.user._id;
@@ -284,4 +290,4 @@ const reverseSettlement = async (req, tripId, settlementId, { reason }) => withL
   return { changed: true, result: serializeSettlement(settlement) };
 });
 
-module.exports = { participants, list, get, create, update, voidExpense, summary, settlementSuggestions, recordSettlement, listSettlements, reverseSettlement };
+module.exports = { participants, list, get, create, update, voidExpense, summary, settlementSuggestions, recordSettlement, listSettlements, reverseSettlement, assertActiveMember, loadLedger };

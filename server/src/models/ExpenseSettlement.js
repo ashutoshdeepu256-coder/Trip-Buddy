@@ -10,6 +10,8 @@ const settlementSchema = new mongoose.Schema({
   amountMinorUnits: { type: Number, min: 1, max: MAX_MINOR_UNITS, required: true, validate: Number.isSafeInteger },
   currency: { type: String, enum: supportedCurrencies, required: true },
   note: { type: String, trim: true, maxlength: 240, default: "" },
+  source: { type: String, enum: ["USER_REPORTED", "PROVIDER_VERIFIED"], default: "USER_REPORTED", required: true },
+  paymentAttempt: { type: mongoose.Schema.Types.ObjectId, ref: "PaymentAttempt", default: null },
   status: { type: String, enum: ["RECORDED", "REVERSED"], default: "RECORDED", index: true },
   recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   recordedAt: { type: Date, default: Date.now },
@@ -22,5 +24,6 @@ const settlementSchema = new mongoose.Schema({
 settlementSchema.index({ trip: 1, status: 1, recordedAt: -1 });
 settlementSchema.index({ trip: 1, currency: 1, status: 1 });
 settlementSchema.index({ trip: 1, recordedBy: 1, idempotencyKey: 1 }, { unique: true });
+settlementSchema.index({ paymentAttempt: 1 }, { unique: true, partialFilterExpression: { paymentAttempt: { $type: "objectId" } } });
 
 module.exports = mongoose.models.ExpenseSettlement || mongoose.model("ExpenseSettlement", settlementSchema);

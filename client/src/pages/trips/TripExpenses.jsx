@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../../store/authStore'
 import expenseService from '../../services/expenseService'
+import paymentService from '../../services/paymentService'
 import { currencies, formatMoney, parseMinorUnits, previewSplit } from '../../utils/expenseMoney'
 import './TripExpenses.css'
 
@@ -31,6 +32,7 @@ function TripExpenses() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const paymentKeys = useRef(new Map())
   const load = useCallback(async (page = 1) => {
     setLoading(true)
     setError('')
@@ -159,6 +161,21 @@ function TripExpenses() {
     finally { setSaving(false) }
   }
 
+  const paySuggestion = async (suggestion) => {
+    setSaving(true)
+    const fingerprint = `${tripId}:${suggestion.toUserId}:${suggestion.amountMinorUnits}:${suggestion.currency}`
+    if (!paymentKeys.current.has(fingerprint)) paymentKeys.current.set(fingerprint, crypto.randomUUID())
+    try {
+      const result = await paymentService.create({ tripId, recipientUserId: suggestion.toUserId, amountMinorUnits: suggestion.amountMinorUnits, currency: suggestion.currency }, paymentKeys.current.get(fingerprint))
+      await paymentService.openCheckout(result.payment, {
+        onVerified: async () => { paymentKeys.current.delete(fingerprint); toast.success('Razorpay verified the payment.'); await load(pagination.page) },
+        onFailure: (message) => toast(message),
+        onDismiss: () => toast('Checkout closed. The provider order remains pending and reserves this balance.'),
+      })
+    } catch (requestError) { toast.error(requestError.response?.data?.error?.message || requestError.message || 'Could not start Razorpay checkout.') }
+    finally { setSaving(false) }
+  }
+
   const reverseSettlement = async (settlement) => {
     if (!window.confirm('Reverse this user-reported settlement record?')) return
     setSaving(true)
@@ -175,13 +192,13 @@ function TripExpenses() {
 
   return (
     <main className="expense-page">
-      <header className="expense-header"><div><Link to={`/trips/${tripId}`} className="expense-back">← {trip?.title || 'Trip'}</Link><span className="eyebrow">Shared trip ledger</span><h1>Expenses</h1><p>Amounts use integer minor units. Each currency is balanced separately.</p></div><span className="expense-access-label">Active Trip members only</span></header>
+      <header className="expense-header"><div><Link to={`/trips/${tripId}`} className="expense-back">← {trip?.title || 'Trip'}</Link><span className="eyebrow">Shared trip ledger</span><h1>Expenses</h1><p>Amounts use integer minor units. Each currency is balanced separately.</p></div><div><span className="expense-access-label">Active Trip members only</span> <Link to="/payments" className="expense-history-link">Payment history</Link></div></header>
       {error && <div className="expense-error" role="alert">{error}<button type="button" className="secondary-btn" onClick={() => load(pagination.page)}>Retry</button></div>}
       <section className="expense-summary" aria-labelledby="expense-summary-title">
         <div className="expense-section-title"><div><span className="eyebrow">Server calculated</span><h2 id="expense-summary-title">Balances by currency</h2></div><span className="expense-revision">Ledger revision {trip?.revision ?? 0}</span></div>
         {!trip?.currencies?.length ? <p className="expense-empty">No expenses have been recorded for this Trip.</p> : <div className="balance-grid">{trip.currencies.map((ledger) => <article className="balance-card" key={ledger.currency}><h3>{ledger.currency} · {formatMoney(ledger.totalExpenseMinorUnits, ledger.currency)} recorded shares</h3>{ledger.members.map((member) => <div className="balance-row" key={member.userId}><span>{member.name}{member.userId === currentUserId ? ' (you)' : ''}</span><strong className={member.netMinorUnits > 0 ? 'credit' : member.netMinorUnits < 0 ? 'debit' : ''}>{member.netMinorUnits > 0 ? 'gets back ' : member.netMinorUnits < 0 ? 'owes ' : ''}{formatMoney(Math.abs(member.netMinorUnits), ledger.currency)}</strong><small>paid {formatMoney(member.paidMinorUnits, ledger.currency)} · share {formatMoney(member.shareMinorUnits, ledger.currency)}</small></div>)}</article>)}</div>}
       </section>
-      <section className="expense-settlements" aria-labelledby="suggestion-title"><div className="expense-section-title"><div><span className="eyebrow">No transfers</span><h2 id="suggestion-title">Suggested settlements</h2></div></div><p className="expense-hint">Suggestions simplify current balances. Recording one is a user report, not proof or processing of payment.</p>{!suggestions.length ? <p className="expense-empty">No settlements are needed based on the current ledger.</p> : <ul className="suggestion-list">{suggestions.map((item) => <li key={`${item.fromUserId}-${item.toUserId}-${item.currency}`}><span><strong>{item.fromName}</strong> pays <strong>{item.toName}</strong> <b>{formatMoney(item.amountMinorUnits, item.currency)}</b></span>{item.fromUserId === currentUserId && <button type="button" disabled={saving} className="secondary-btn" onClick={() => recordSuggestion(item)}>Record my payment</button>}</li>)}</ul>}</section>
+      <section className="expense-settlements" aria-labelledby="suggestion-title"><div className="expense-section-title"><div><span className="eyebrow">No transfers</span><h2 id="suggestion-title">Suggested settlements</h2></div></div><p className="expense-hint">Razorpay Route checkout is available for onboarded recipients in INR. Provider payments update balances only after Razorpay verifies the recipient transfer. Manual records remain user reported.</p>{!suggestions.length ? <p className="expense-empty">No settlements are needed based on the current ledger.</p> : <ul className="suggestion-list">{suggestions.map((item) => <li key={`${item.fromUserId}-${item.toUserId}-${item.currency}`}><span><strong>{item.fromName}</strong> pays <strong>{item.toName}</strong> <b>{formatMoney(item.amountMinorUnits, item.currency)}</b></span>{item.fromUserId === currentUserId && <span className="suggestion-actions">{item.currency === 'INR' && members.find((member) => member.userId === item.toUserId)?.paymentAvailable && <button type="button" disabled={saving} className="primary-btn" onClick={() => paySuggestion(item)}>Pay with Razorpay</button>}<button type="button" disabled={saving} className="secondary-btn" onClick={() => recordSuggestion(item)}>Record as paid manually</button></span>}</li>)}</ul>}</section>
       <section className="expense-editor" aria-labelledby="editor-title"><div className="expense-section-title"><div><span className="eyebrow">{editing ? 'Revision checked' : 'Add a shared expense'}</span><h2 id="editor-title">{editing ? 'Edit expense' : 'New expense'}</h2></div>{editing && <button type="button" className="text-link" onClick={resetForm}>Cancel edit</button>}</div>
         <form onSubmit={submitExpense} className="expense-form">
           <label>Description<input required maxLength="160" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Dinner, museum tickets…" /></label>
