@@ -221,6 +221,14 @@ const protectedRoutes = [
   ["POST", "/api/v1/payments/507f1f77bcf86cd799439011/verify"],
   ["POST", "/api/v1/payments/507f1f77bcf86cd799439011/reconcile"],
   ["POST", "/api/v1/payments/507f1f77bcf86cd799439011/refund"],
+  ["POST", "/api/v1/reviews"],
+  ["GET", "/api/v1/reviews/trips/507f1f77bcf86cd799439011/eligibility"],
+  ["GET", "/api/v1/reviews/507f1f77bcf86cd799439011"],
+  ["PATCH", "/api/v1/reviews/507f1f77bcf86cd799439011"],
+  ["DELETE", "/api/v1/reviews/507f1f77bcf86cd799439011"],
+  ["POST", "/api/v1/reviews/507f1f77bcf86cd799439011/reports"],
+  ["GET", "/api/v1/admin/reviews/reports"],
+  ["PATCH", "/api/v1/admin/reviews/507f1f77bcf86cd799439011"],
   ["GET", "/api/v1/itineraries/507f1f77bcf86cd799439011/shared"],
   ["PUT", "/api/v1/itineraries/507f1f77bcf86cd799439011/collaboration"],
   ["GET", "/api/v1/itineraries/507f1f77bcf86cd799439011/collaborators"],
@@ -292,6 +300,15 @@ test("trip detail rejects malformed ids before database access", async () => {
   const { response, payload } = await request("GET", "/api/v1/trips/not-an-id");
   assert.equal(response.status, 400);
   assert.equal(payload.error.code, "VALIDATION_ERROR");
+});
+
+test("public review endpoints validate Trip and traveler ids before database access", async () => {
+  const traveller = await request("GET", "/api/v1/reviews/travellers/not-an-id");
+  assert.equal(traveller.response.status, 400);
+  assert.equal(traveller.payload.error.code, "VALIDATION_ERROR");
+  const trip = await request("GET", "/api/v1/reviews/trips/not-an-id");
+  assert.equal(trip.response.status, 400);
+  assert.equal(trip.payload.error.code, "VALIDATION_ERROR");
 });
 
 test("trip creation rejects invalid draft fields after authentication", async () => {

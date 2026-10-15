@@ -7,6 +7,7 @@ import CompatibilityScore from '../../components/matching/CompatibilityScore'
 import GroupFormationPanel from '../../components/matching/GroupFormationPanel'
 import ConnectionRequestButton from '../../components/connections/ConnectionRequestButton'
 import chatService from '../../services/chatService'
+import ReviewSection from '../../components/reviews/ReviewSection'
 import MapPanel from '../../components/maps/MapPanel'
 import '../TripPages.css'
 
@@ -145,6 +146,7 @@ function TripDetails() {
       <div className="trip-detail-layout">
         <div className="trip-detail-main">
           <section className="trip-panel"><h2>About this trip</h2><p>{trip.description || 'The creator has not added a description yet.'}</p></section>
+          {trip.status === 'COMPLETED' && <section className="trip-panel"><ReviewSection mode="trip" targetId={trip.id} currentUserId={user?.id} allowCompose={Boolean(user && (trip.isOwner || trip.isMember))} /></section>}
           <section className="trip-panel trip-facts-grid">
             <p><strong>Dates</strong><span>{displayDate(trip.startDate)} – {displayDate(trip.endDate)}</span></p>
             <p><strong>Budget</strong><span>{trip.budget?.min != null ? `${trip.budget.currency} ${trip.budget.min}${trip.budget.max != null ? `–${trip.budget.max}` : '+'}` : 'Not set'}</span></p>

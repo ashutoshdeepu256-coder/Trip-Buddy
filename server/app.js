@@ -21,6 +21,8 @@ const mapsRoutes = require("./src/routes/maps.routes");
 const bookingRoutes = require("./src/routes/booking.routes");
 const expenseRoutes = require("./src/routes/expense.routes");
 const paymentRoutes = require("./src/routes/payment.routes");
+const reviewRoutes = require("./src/routes/review.routes");
+const adminReviewRoutes = require("./src/routes/admin-review.routes");
 
 const app = express();
 
@@ -85,6 +87,8 @@ app.use("/api/v1/itineraries", itineraryRoutes);
 app.use("/api/v1/bookings", bookingRoutes);
 app.use("/api/v1/expenses", expenseRoutes);
 app.use("/api/v1/payments", paymentRoutes.routes);
+app.use("/api/v1/reviews", reviewRoutes);
+app.use("/api/v1/admin/reviews", adminReviewRoutes);
 app.use("/api/v1", tripDiscoveryRoutes);
 app.use("/api/v1", tripRoutes);
 

@@ -4,6 +4,7 @@ import api from '../services/api'
 import { TrustBadge } from './ProfilePage'
 import { useAuthStore } from '../store/authStore'
 import ConnectionRequestButton from '../components/connections/ConnectionRequestButton'
+import ReviewSection from '../components/reviews/ReviewSection'
 
 function PublicProfilePage() {
   const { userId } = useParams()
@@ -49,6 +50,7 @@ function PublicProfilePage() {
             {profile.trust.averageRating !== null && <span>{profile.trust.averageRating} average rating</span>}
           </div>
         </section>
+        <ReviewSection mode="traveller" targetId={userId} currentUserId={currentUser?.id} />
       </div>
     </main>
   )

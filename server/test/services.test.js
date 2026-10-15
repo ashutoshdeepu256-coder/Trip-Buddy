@@ -187,7 +187,14 @@ test("a duplicate open report is rejected", async (context) => {
   );
 });
 
-test("trust signals use factual verified fields and do not invent a score", async () => {
+test("trust signals use factual verified fields and do not invent a score", async (context) => {
+  const Trip = require("../src/models/Trip");
+  const TripMember = require("../src/models/TripMember");
+  const reviewReputation = require("../src/services/review-reputation.service");
+  const emptyQuery = () => ({ select() { return this; }, lean: async () => [] });
+  context.mock.method(TripMember, "find", emptyQuery);
+  context.mock.method(Trip, "find", emptyQuery);
+  context.mock.method(reviewReputation, "getRatingSummary", async () => ({ reviewCount: 0, averageRating: null }));
   const signals = await trustService.getTrustSignals({
     _id: "507f1f77bcf86cd799439011",
     verification: {
