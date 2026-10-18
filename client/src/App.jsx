@@ -23,6 +23,7 @@ import TripExpenses from './pages/trips/TripExpenses'
 import PaymentsPage from './pages/PaymentsPage'
 import SafetyCenter from './pages/SafetyCenter'
 import NotificationsPage from './pages/NotificationsPage'
+import TravelAssistant from './pages/TravelAssistant'
 import NotificationBell from './components/notifications/NotificationBell'
 import { useNotificationStore } from './store/notificationStore'
 
@@ -94,6 +95,7 @@ function App() {
             <Link to="/connections">Connections</Link>
             <Link to="/chat">Messages</Link>
             <Link to="/planner">Planner</Link>
+            <Link to="/assistant">AI assistant</Link>
             <Link to="/bookings">Travel services</Link>
             <Link to="/safety">Safety Center</Link>
             <Link to="/profile" className="text-link">My profile</Link>
@@ -234,6 +236,7 @@ function App() {
       <Route path="/connections/sent" element={<ProtectedRoute><ConnectionsPage /></ProtectedRoute>} />
       <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
       <Route path="/planner" element={<ProtectedRoute><ItineraryPlanner /></ProtectedRoute>} />
+      <Route path="/assistant" element={<ProtectedRoute><TravelAssistant /></ProtectedRoute>} />
       <Route path="/bookings" element={<ProtectedRoute><BookingsPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
