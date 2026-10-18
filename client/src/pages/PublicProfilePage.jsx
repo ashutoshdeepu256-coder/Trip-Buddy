@@ -5,11 +5,14 @@ import { TrustBadge } from './ProfilePage'
 import { useAuthStore } from '../store/authStore'
 import ConnectionRequestButton from '../components/connections/ConnectionRequestButton'
 import ReviewSection from '../components/reviews/ReviewSection'
+import safetyService from '../services/safetyService'
 
 function PublicProfilePage() {
   const { userId } = useParams()
   const [profile, setProfile] = useState(null)
   const [error, setError] = useState('')
+  const [safetyMessage, setSafetyMessage] = useState('')
+  const [safetyBusy, setSafetyBusy] = useState(false)
   const currentUser = useAuthStore((state) => state.user)
 
   useEffect(() => {
@@ -37,8 +40,9 @@ function PublicProfilePage() {
         </div>
         <p className="profile-bio">{profile.profile?.bio || 'This traveler has not added a bio yet.'}</p>
         {currentUser && currentUser.id !== userId
-          ? <ConnectionRequestButton recipientId={userId} />
+          ? <div className="profile-actions"><ConnectionRequestButton recipientId={userId} /><button type="button" className="secondary-btn" disabled={safetyBusy} onClick={async () => { setSafetyBusy(true); setSafetyMessage(''); try { await safetyService.block(userId); setSafetyMessage('Traveller blocked. Their matching, connection and direct chat access is restricted.'); } catch (requestError) { setSafetyMessage(requestError.response?.data?.error?.message || 'Could not block this traveller.'); } finally { setSafetyBusy(false) } }}>Block traveller</button><Link className="secondary-btn" to={`/safety?reportedUserId=${encodeURIComponent(userId)}`}>Report traveller</Link></div>
           : !currentUser && <Link className="primary-btn" to="/login">Sign in to connect</Link>}
+        {safetyMessage && <p className="muted-copy" role="status">{safetyMessage}</p>}
         <section className="trust-summary">
           <h2>Verified signals</h2>
           <TrustBadge verified={profile.trust.emailVerified} label="Email verified" />

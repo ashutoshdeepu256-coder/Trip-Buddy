@@ -171,7 +171,7 @@ test("users cannot report themselves", async () => {
 });
 
 test("a duplicate open report is rejected", async (context) => {
-  context.mock.method(User, "findById", async () => ({ _id: "507f1f77bcf86cd799439012" }));
+  context.mock.method(User, "exists", async () => ({ _id: "507f1f77bcf86cd799439012" }));
   context.mock.method(Report, "exists", async () => ({ _id: "existing-report" }));
   await assert.rejects(
     safetyService.createReport(

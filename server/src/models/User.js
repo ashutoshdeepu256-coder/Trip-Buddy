@@ -54,6 +54,10 @@ const userSchema = new mongoose.Schema(
       default: "ACTIVE",
       index: true,
     },
+    safetySettings: {
+      discoverable: { type: Boolean, default: true },
+      allowConnectionRequests: { type: Boolean, default: true },
+    },
     razorpayLinkedAccountId: { type: String, trim: true, maxlength: 80, match: /^acc_[A-Za-z0-9]+$/, select: false, default: null },
     email: {
       type: String,

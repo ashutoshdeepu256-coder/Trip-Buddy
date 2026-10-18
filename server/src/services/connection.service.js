@@ -79,8 +79,8 @@ const populateSafe = (query) => query
 const sendRequest = async (actor, values, req) => {
   await activeActor(actor._id);
   if (idOf(actor._id) === values.recipientId) throw new HttpError(400, "You cannot connect with yourself", "SELF_CONNECTION_FORBIDDEN");
-  const recipient = await User.findById(values.recipientId).select("_id accountStatus").lean();
-  if (!recipient || (recipient.accountStatus && recipient.accountStatus !== "ACTIVE")) {
+  const recipient = await User.findById(values.recipientId).select("_id accountStatus safetySettings.allowConnectionRequests").lean();
+  if (!recipient || (recipient.accountStatus && recipient.accountStatus !== "ACTIVE") || recipient.safetySettings?.allowConnectionRequests === false) {
     throw new HttpError(404, "Traveller was not found", "TRAVELLER_NOT_FOUND");
   }
   await ensureNotBlocked(actor._id, recipient._id);

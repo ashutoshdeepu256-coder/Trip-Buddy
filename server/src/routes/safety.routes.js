@@ -5,6 +5,7 @@ const validate = require("../middleware/validate");
 const { requireAuth, requireModerator } = require("../middleware/auth");
 const { asyncHandler, rateLimitHandler } = require("../utils/http");
 const { reportSchema } = require("../validators/verification");
+const safetySchemas = require("../validators/safety-center.validator");
 
 const router = express.Router();
 const reportLimiter = rateLimit({
@@ -14,30 +15,36 @@ const reportLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitHandler,
 });
+const userRateKey = (req) => req.user._id.toString();
+const writeLimiter = rateLimit({ windowMs: 60_000, limit: 20, keyGenerator: userRateKey, standardHeaders: true, legacyHeaders: false, handler: rateLimitHandler });
 const reportReviewSchema = require("zod").z.object({
   status: require("zod").z.enum(["UNDER_REVIEW", "RESOLVED", "DISMISSED"]),
-  resolution: require("zod").z.string().trim().max(2000).optional().default(""),
+  moderatorNotes: require("zod").z.string().trim().max(2000).optional().default(""),
 });
-const reportQuerySchema = require("zod").z.object({
-  status: require("zod").z.enum(["OPEN", "UNDER_REVIEW", "RESOLVED", "DISMISSED"]).optional(),
-  page: require("zod").z.coerce.number().int().min(1).max(10000).default(1),
-  limit: require("zod").z.coerce.number().int().min(1).max(100).default(25),
-});
-
 router.use(requireAuth);
-router.post("/block/:userId", asyncHandler(controller.block));
-router.delete("/block/:userId", asyncHandler(controller.unblock));
+router.post("/block/:userId", writeLimiter, asyncHandler(controller.block));
+router.delete("/block/:userId", writeLimiter, asyncHandler(controller.unblock));
 router.get("/blocked-users", asyncHandler(controller.listBlocked));
 router.post("/reports", reportLimiter, validate(reportSchema), asyncHandler(controller.report));
+router.get("/reports/mine", validate(safetySchemas.pageQuery, "query"), asyncHandler(controller.myReports));
+router.get("/settings", asyncHandler(controller.settings));
+router.patch("/settings", writeLimiter, validate(safetySchemas.preferences), asyncHandler(controller.updateSettings));
+router.get("/emergency-contacts", asyncHandler(controller.listContacts));
+router.post("/emergency-contacts", writeLimiter, validate(safetySchemas.contact), asyncHandler(controller.addContact));
+router.patch("/emergency-contacts/:contactId", writeLimiter, validate(safetySchemas.contactParams, "params"), validate(safetySchemas.contact), asyncHandler(controller.updateContact));
+router.delete("/emergency-contacts/:contactId", writeLimiter, validate(safetySchemas.contactParams, "params"), asyncHandler(controller.removeContact));
+router.get("/trips/:tripId", validate(safetySchemas.tripParams, "params"), asyncHandler(controller.tripSafety));
+router.patch("/trips/:tripId", writeLimiter, validate(safetySchemas.tripParams, "params"), validate(safetySchemas.tripSafety), asyncHandler(controller.updateTripSafety));
 router.get(
   "/admin/reports",
   requireModerator,
-  validate(reportQuerySchema, "query"),
+  validate(safetySchemas.reportQuery, "query"),
   asyncHandler(controller.listReports),
 );
 router.patch(
   "/admin/reports/:reportId",
   requireModerator,
+  validate(require("zod").z.object({ reportId: require("zod").z.string().regex(/^[a-f\d]{24}$/i) }), "params"),
   validate(reportReviewSchema),
   asyncHandler(controller.reviewReport),
 );

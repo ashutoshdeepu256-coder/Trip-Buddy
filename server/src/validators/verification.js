@@ -13,19 +13,36 @@ const reviewSchema = z.object({
 });
 
 const reportSchema = z.object({
-  reportedUserId: z.string().regex(/^[a-f\d]{24}$/i),
+  targetType: z.enum(["TRAVELLER", "TRIP", "MESSAGE", "REVIEW", "INCIDENT"]).optional().default("TRAVELLER"),
+  reportedUserId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
+  targetId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
   reason: z.enum([
     "SPAM",
     "HARASSMENT",
     "SCAM",
     "FAKE_PROFILE",
     "INAPPROPRIATE_CONTENT",
+    "THREATS",
+    "DISCRIMINATION",
+    "UNSAFE_MEETING",
+    "EMERGENCY",
     "SAFETY_CONCERN",
     "OTHER",
   ]),
-  description: z.string().trim().max(3000).optional().default(""),
+  description: z.string().trim().min(10).max(3000),
   tripId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
   messageId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
+}).strict().superRefine((value, context) => {
+  if (value.targetType === "INCIDENT" && (value.targetId || value.reportedUserId || value.tripId || value.messageId)) context.addIssue({ code: "custom", path: ["targetId"], message: "General incidents must not include a target reference" });
+  if (value.targetType === "TRAVELLER" && (value.targetId || value.tripId || value.messageId)) context.addIssue({ code: "custom", path: ["targetId"], message: "Only a traveller reference is allowed for this report type" });
+  if (value.targetType === "TRAVELLER" && !value.reportedUserId) context.addIssue({ code: "custom", path: ["reportedUserId"], message: "A traveller is required" });
+  if (["TRIP", "MESSAGE", "REVIEW"].includes(value.targetType)) {
+    const ref = value.targetId || (value.targetType === "TRIP" ? value.tripId : value.targetType === "MESSAGE" ? value.messageId : null);
+    if (!ref) context.addIssue({ code: "custom", path: ["targetId"], message: "A target reference is required" });
+  }
+  if (value.targetType === "TRIP" && (value.reportedUserId || value.messageId)) context.addIssue({ code: "custom", path: ["targetId"], message: "Only a trip reference is allowed for this report type" });
+  if (value.targetType === "MESSAGE" && (value.reportedUserId || value.tripId)) context.addIssue({ code: "custom", path: ["targetId"], message: "Only a message reference is allowed for this report type" });
+  if (value.targetType === "REVIEW" && (value.reportedUserId || value.tripId || value.messageId)) context.addIssue({ code: "custom", path: ["targetId"], message: "Only a review reference is allowed for this report type" });
 });
 
 const adminListQuerySchema = z.object({

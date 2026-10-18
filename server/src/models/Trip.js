@@ -76,6 +76,13 @@ const tripSchema = new mongoose.Schema(
     publishedAt: { type: Date, default: null },
     cancelledAt: { type: Date, default: null },
     completedAt: { type: Date, default: null },
+    safetyInfo: {
+      meetingPoint: { type: String, trim: true, maxlength: 500, default: "" },
+      checklist: { type: [String], default: [] },
+      emergencyNotes: { type: String, trim: true, maxlength: 2000, default: "" },
+      updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      updatedAt: { type: Date, default: null },
+    },
     expenseRevision: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true },

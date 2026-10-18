@@ -3,9 +3,11 @@ const mongoose = require("mongoose");
 const reportSchema = new mongoose.Schema(
   {
     reporter: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    reportedUser: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    reportedUser: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    targetType: { type: String, enum: ["TRAVELLER", "TRIP", "MESSAGE", "REVIEW", "INCIDENT"], default: "TRAVELLER", index: true },
     trip: { type: mongoose.Schema.Types.ObjectId, ref: "Trip", default: null },
     message: { type: mongoose.Schema.Types.ObjectId, ref: "Message", default: null },
+    review: { type: mongoose.Schema.Types.ObjectId, ref: "Review", default: null },
     reason: {
       type: String,
       enum: [
@@ -14,6 +16,10 @@ const reportSchema = new mongoose.Schema(
         "SCAM",
         "FAKE_PROFILE",
         "INAPPROPRIATE_CONTENT",
+        "THREATS",
+        "DISCRIMINATION",
+        "UNSAFE_MEETING",
+        "EMERGENCY",
         "SAFETY_CONCERN",
         "OTHER",
       ],
@@ -23,11 +29,13 @@ const reportSchema = new mongoose.Schema(
     evidence: { type: [String], default: [] },
     status: {
       type: String,
-      enum: ["OPEN", "UNDER_REVIEW", "RESOLVED", "DISMISSED"],
-      default: "OPEN",
+      enum: ["SUBMITTED", "OPEN", "UNDER_REVIEW", "RESOLVED", "DISMISSED"],
+      default: "SUBMITTED",
     },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     resolution: { type: String, select: false, maxlength: 2000, default: "" },
+    moderatorNotes: { type: String, select: false, maxlength: 2000, default: "" },
+    history: { type: [{ status: String, actor: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, note: { type: String, maxlength: 2000 }, at: { type: Date, default: Date.now } }], default: [] },
     activeReportKey: { type: String, select: false },
     resolvedAt: { type: Date, default: null },
   },

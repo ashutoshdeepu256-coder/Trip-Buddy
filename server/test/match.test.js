@@ -157,6 +157,7 @@ test("a creator cannot inspect compatibility for their own trip", async (context
 });
 
 test("completed and full trips cannot produce compatibility recommendations", async (context) => {
+  context.mock.method(User, "findById", () => ({ select() { return this; }, lean: async () => ({ safetySettings: { discoverable: true } }) }));
   let accessibleTrip = { ...trip, status: "COMPLETED" };
   context.mock.method(tripService, "getAccessibleTrip", async () => accessibleTrip);
   context.mock.method(safetyService, "isInteractionBlocked", async () => false);
@@ -176,6 +177,7 @@ test("completed and full trips cannot produce compatibility recommendations", as
 });
 
 test("refresh recalculates and persists one match for the authenticated user-trip pair", async (context) => {
+  context.mock.method(User, "findById", () => ({ select() { return this; }, lean: async () => ({ safetySettings: { discoverable: true } }) }));
   context.mock.method(tripService, "getAccessibleTrip", async () => ({ ...trip, destination: { name: "Kyoto" } }));
   context.mock.method(safetyService, "isInteractionBlocked", async () => false);
   context.mock.method(TripMember, "countDocuments", async () => 1);

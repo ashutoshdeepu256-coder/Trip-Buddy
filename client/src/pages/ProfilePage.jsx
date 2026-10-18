@@ -177,6 +177,7 @@ function ProfilePage({ edit = false, travelPreferences = false }) {
           <Link className="secondary-btn" to="/profile/edit">Edit profile</Link>
           <Link className="secondary-btn" to="/profile/travel-preferences">Travel preferences</Link>
           <Link className="primary-btn" to="/verification">Verification &amp; Trust</Link>
+          <Link className="secondary-btn" to="/safety">Safety Center</Link>
         </div>
         <section className="trust-summary">
           <h2>Verification &amp; Trust</h2>

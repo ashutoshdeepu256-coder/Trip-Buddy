@@ -232,8 +232,8 @@ const eligibleSnapshot = async (trip, actor, now) => {
   const excludedIds = [...new Set([idOf(actor), ...memberIds.map(idOf), ...declinedIds])]
     .filter(Boolean)
     .map((id) => new mongoose.Types.ObjectId(id));
-  const candidateDocs = await User.find(buildEligibleUserQuery(excludedIds))
-    .select("_id accountStatus profile.travelPreferences updatedAt")
+  const candidateDocs = await User.find({ ...buildEligibleUserQuery(excludedIds), "safetySettings.discoverable": { $ne: false } })
+    .select("_id accountStatus safetySettings.discoverable profile.travelPreferences updatedAt")
     .sort({ updatedAt: -1, _id: 1 })
     .limit(MAX_CANDIDATES + 1)
     .lean();

@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Match = require("../models/Match");
+const User = require("../models/User");
 const TripMember = require("../models/TripMember");
 const { calculateCompatibility } = require("../ai/matching.engine");
 const tripService = require("./trip.service");
@@ -86,6 +87,8 @@ const loadAccessibleTrip = async (tripId, user) => {
   if (creatorId === objectIdString(user._id)) {
     throw new HttpError(409, "A trip creator cannot request compatibility for their own trip", "SELF_MATCH_UNAVAILABLE");
   }
+  const creatorSettings = await User.findById(creatorId).select("safetySettings.discoverable").lean();
+  if (creatorSettings?.safetySettings?.discoverable === false) throw new HttpError(404, "Trip was not found", "TRIP_NOT_FOUND");
   if (await safetyService.isInteractionBlocked(user._id, creatorId)) {
     throw new HttpError(404, "Trip was not found", "TRIP_NOT_FOUND");
   }

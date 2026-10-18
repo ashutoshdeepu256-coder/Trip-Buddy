@@ -21,6 +21,7 @@ import ItineraryPlanner from './pages/ItineraryPlanner'
 import BookingsPage from './pages/BookingsPage'
 import TripExpenses from './pages/trips/TripExpenses'
 import PaymentsPage from './pages/PaymentsPage'
+import SafetyCenter from './pages/SafetyCenter'
 
 const facts = [
   { label: 'Travel style', value: 'Your pace' },
@@ -83,6 +84,7 @@ function App() {
             <Link to="/chat">Messages</Link>
             <Link to="/planner">Planner</Link>
             <Link to="/bookings">Travel services</Link>
+            <Link to="/safety">Safety Center</Link>
             <Link to="/profile" className="text-link">My profile</Link>
             <button type="button" className="secondary-btn nav-action" onClick={logout}>
               Sign out
@@ -206,6 +208,7 @@ function App() {
       <Route path="/trips/:tripId" element={<TripDetails />} />
       <Route path="/trips/:tripId/expenses" element={<ProtectedRoute><TripExpenses /></ProtectedRoute>} />
       <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
+      <Route path="/safety" element={<ProtectedRoute><SafetyCenter /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       <Route path="/profile/edit" element={<ProtectedRoute><ProfilePage edit /></ProtectedRoute>} />
       <Route path="/profile/travel-preferences" element={<ProtectedRoute><ProfilePage edit travelPreferences /></ProtectedRoute>} />

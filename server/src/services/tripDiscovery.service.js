@@ -38,7 +38,7 @@ const lookupStages = [
       from: "users",
       let: { creatorId: "$creator" },
       pipeline: [
-        { $match: { $expr: { $eq: ["$_id", "$$creatorId"] } } },
+        { $match: { $expr: { $eq: ["$_id", "$$creatorId"] }, "safetySettings.discoverable": { $ne: false } } },
         {
           $project: {
             name: 1,
