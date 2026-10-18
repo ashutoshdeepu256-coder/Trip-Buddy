@@ -14,6 +14,9 @@ const safetyService = {
   myReports: async () => (await api.get('/safety/reports/mine')).data.data,
   moderatorReports: async () => (await api.get('/safety/admin/reports')).data.data,
   resolveReport: async (id, values) => (await api.patch(`/safety/admin/reports/${encodeURIComponent(id)}`, values)).data.data,
+  moderationQueue: async (status = 'OPEN') => (await api.get('/safety/admin/moderation', { params: { status } })).data.data,
+  decideModeration: async (id, values) => (await api.patch(`/safety/admin/moderation/${encodeURIComponent(id)}`, values)).data.data,
+  appealModeration: async (id, reason) => (await api.post(`/safety/moderation/${encodeURIComponent(id)}/appeal`, { reason })).data.data,
   tripSafety: async (tripId) => (await api.get(`/safety/trips/${encodeURIComponent(tripId)}`)).data.data,
   updateTripSafety: async (tripId, values) => (await api.patch(`/safety/trips/${encodeURIComponent(tripId)}`, values)).data.data,
 }

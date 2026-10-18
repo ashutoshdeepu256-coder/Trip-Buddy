@@ -4,6 +4,7 @@ const messageSchema = new mongoose.Schema({
   conversation: { type: mongoose.Schema.Types.ObjectId, ref: "Conversation", required: true },
   sender: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   text: { type: String, required: true, trim: true, minlength: 1, maxlength: 4000 },
+  moderationStatus: { type: String, enum: ["ALLOWED", "HELD", "HIDDEN"], default: "ALLOWED", index: true },
   idempotencyKey: { type: String, required: true, trim: true, minlength: 8, maxlength: 100 },
   deliveredTo: { type: [mongoose.Schema.Types.ObjectId], default: [] },
   readBy: { type: [mongoose.Schema.Types.ObjectId], default: [] },

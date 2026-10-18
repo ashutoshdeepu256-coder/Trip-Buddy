@@ -7,6 +7,8 @@
 .chat-connection { color: #fbbf24; font-size: .82rem; }
 .chat-connection.online { color: #86efac; }
 .chat-error { width: min(1240px, 100%); margin: 0 auto 14px; padding: 10px 14px; border: 1px solid rgba(248, 113, 113, .42); border-radius: 10px; color: #fecaca; background: rgba(127, 29, 29, .25); }
+.chat-appeal { width: min(1240px, 100%); margin: 0 auto 14px; display: grid; gap: 8px; padding: 12px 14px; border: 1px solid rgba(251, 191, 36, .4); border-radius: 10px; color: #fef3c7; background: rgba(120, 73, 15, .2); }
+.chat-appeal textarea { min-height: 58px; padding: 8px; border-radius: 8px; font: inherit; }
 .chat-layout { width: min(1240px, 100%); height: min(760px, calc(100vh - 110px)); min-height: 480px; margin: 0 auto; display: grid; grid-template-columns: 320px minmax(0, 1fr); overflow: hidden; border: 1px solid rgba(148, 163, 184, .2); border-radius: 18px; background: rgba(12, 24, 41, .92); box-shadow: 0 24px 72px rgba(0, 0, 0, .2); }
 .chat-sidebar { min-width: 0; overflow-y: auto; border-right: 1px solid rgba(148, 163, 184, .16); }
 .chat-sidebar-heading { display: flex; justify-content: space-between; align-items: baseline; padding: 19px 16px 12px; }

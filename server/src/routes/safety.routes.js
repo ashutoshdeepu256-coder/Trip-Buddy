@@ -21,6 +21,15 @@ const reportReviewSchema = require("zod").z.object({
   status: require("zod").z.enum(["UNDER_REVIEW", "RESOLVED", "DISMISSED"]),
   moderatorNotes: require("zod").z.string().trim().max(2000).optional().default(""),
 });
+const moderationQuerySchema = require("zod").z.object({
+  status: require("zod").z.enum(["OPEN", "ALL"]).default("OPEN"),
+  page: require("zod").z.coerce.number().int().min(1).max(10000).default(1),
+  limit: require("zod").z.coerce.number().int().min(1).max(50).default(20),
+}).strict();
+const moderationDecisionSchema = require("zod").z.object({
+  action: require("zod").z.enum(["ALLOW", "FLAG", "HIDE", "RESTORE", "ESCALATE"]),
+  reason: require("zod").z.string().trim().min(3).max(500),
+}).strict();
 router.use(requireAuth);
 router.post("/block/:userId", writeLimiter, asyncHandler(controller.block));
 router.delete("/block/:userId", writeLimiter, asyncHandler(controller.unblock));
@@ -41,6 +50,9 @@ router.get(
   validate(safetySchemas.reportQuery, "query"),
   asyncHandler(controller.listReports),
 );
+router.get("/admin/moderation", requireModerator, validate(moderationQuerySchema, "query"), asyncHandler(controller.listModeration));
+router.patch("/admin/moderation/:recordId", requireModerator, validate(require("zod").z.object({ recordId: require("zod").z.string().regex(/^[a-f\d]{24}$/i) }), "params"), validate(moderationDecisionSchema), asyncHandler(controller.decideModeration));
+router.post("/moderation/:recordId/appeal", validate(require("zod").z.object({ recordId: require("zod").z.string().regex(/^[a-f\d]{24}$/i) }), "params"), validate(require("zod").z.object({ reason: require("zod").z.string().trim().min(10).max(500) }).strict()), asyncHandler(controller.appealModeration));
 router.patch(
   "/admin/reports/:reportId",
   requireModerator,

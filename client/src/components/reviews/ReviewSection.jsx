@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import reviewService from '../../services/reviewService'
+import safetyService from '../../services/safetyService'
 import './ReviewSection.css'
 
 const reasonOptions = [
@@ -25,6 +26,8 @@ function ReviewSection({ mode, targetId, currentUserId = null, allowCompose = fa
   const [reporting, setReporting] = useState(null)
   const [reportReason, setReportReason] = useState('OTHER')
   const [reportDetails, setReportDetails] = useState('')
+  const [appealId, setAppealId] = useState('')
+  const [appealReason, setAppealReason] = useState('')
 
   const load = useCallback(async (nextPage = 1) => {
     setLoading(true)
@@ -72,23 +75,38 @@ function ReviewSection({ mode, targetId, currentUserId = null, allowCompose = fa
     event.preventDefault()
     setBusy(true)
     try {
-      await reviewService.create({ tripId: targetId, revieweeId: targetUserId, rating: Number(rating), comment })
+      const created = await reviewService.create({ tripId: targetId, revieweeId: targetUserId, rating: Number(rating), comment })
       setComment('')
       setRating('5')
-      toast.success('Your verified Trip review was published.')
+      if (created.status === 'HIDDEN') { setAppealId(created.appealId || ''); toast('Your review is held for safety review and is not public.') }
+      else toast.success('Your verified Trip review was published.')
       await Promise.all([load(page), reviewService.eligibility(targetId).then((result) => setEligibility(result.items))])
     } catch (requestError) {
       toast.error(requestError.response?.data?.error?.message || 'Review could not be submitted.')
     } finally { setBusy(false) }
   }
 
+  const submitAppeal = async (event) => {
+    event.preventDefault()
+    if (!appealId || appealReason.trim().length < 10) return
+    setBusy(true)
+    try {
+      await safetyService.appealModeration(appealId, appealReason.trim())
+      setAppealId('')
+      setAppealReason('')
+      toast.success('Your appeal was sent for moderator review.')
+    } catch (requestError) { toast.error(requestError.response?.data?.error?.message || 'Appeal could not be submitted.') }
+    finally { setBusy(false) }
+  }
+
   const saveEdit = async (event) => {
     event.preventDefault()
     setBusy(true)
     try {
-      await reviewService.update(editing.id, { rating: Number(editing.rating), comment: editing.comment })
+      const updated = await reviewService.update(editing.id, { rating: Number(editing.rating), comment: editing.comment })
       setEditing(null)
-      toast.success('Review updated.')
+      if (updated.status === 'HIDDEN') { setAppealId(updated.appealId || ''); toast('Your review is held for safety review and is not public.') }
+      else toast.success('Review updated.')
       await load(page)
     } catch (requestError) { toast.error(requestError.response?.data?.error?.message || 'Review could not be updated.') }
     finally { setBusy(false) }
@@ -141,8 +159,10 @@ function ReviewSection({ mode, targetId, currentUserId = null, allowCompose = fa
       <label>Feedback <span className="review-optional">(optional)</span>
         <textarea value={comment} onChange={(event) => setComment(event.target.value)} maxLength={1000} rows={3} placeholder="Share useful, respectful feedback." />
       </label>
-      <div className="review-form-footer"><small>{comment.length}/1000. Published immediately; reports go to human moderation.</small><button type="submit" className="primary-btn" disabled={busy || !targetUserId}>{busy ? 'Publishing…' : 'Publish review'}</button></div>
+      <div className="review-form-footer"><small>{comment.length}/1000. Most reviews publish immediately; specific direct threats are held for human review.</small><button type="submit" className="primary-btn" disabled={busy || !targetUserId}>{busy ? 'Publishing…' : 'Publish review'}</button></div>
     </form>}
+
+    {appealId && <form className="review-report-form" onSubmit={submitAppeal}><strong>Appeal this hold</strong><label>Explain why this review should be published<textarea value={appealReason} onChange={(event) => setAppealReason(event.target.value)} minLength={10} maxLength={500} required rows={3} /></label><button type="submit" className="secondary-btn" disabled={busy || appealReason.trim().length < 10}>Send appeal</button></form>}
 
     {allowCompose && mode === 'trip' && eligibility.length > 0 && eligibility.every((item) => item.reviewed) && <p className="review-empty">You have reviewed every eligible traveler on this Trip.</p>}
     {allowCompose && mode === 'trip' && eligibility.length === 0 && !loading && <p className="review-empty">No other active Trip members are currently eligible to review.</p>}

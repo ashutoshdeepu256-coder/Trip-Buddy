@@ -2,12 +2,14 @@ const mongoose = require("mongoose");
 const { HttpError, sendSuccess } = require("../utils/http");
 const { publicUser } = require("../services/auth.service");
 const { getPublicProfile } = require("../services/trust.service");
+const moderationService = require("../services/moderation.service");
 
 const currentProfile = (req, res) =>
   sendSuccess(res, { user: publicUser(req.user) });
 
 const updateProfile = async (req, res) => {
   const { name, bio, city, country, travelPreferences } = req.body;
+  const bioModeration = bio === undefined ? null : await moderationService.classify(bio, { actorId: req.user._id, contentType: "PROFILE" });
   if (name !== undefined) req.user.name = name;
   for (const [field, value] of Object.entries({ bio, city, country })) {
     if (value !== undefined) req.user.profile[field] = value;
@@ -19,6 +21,7 @@ const updateProfile = async (req, res) => {
     };
   }
   await req.user.save();
+  if (bioModeration?.recommendedAction !== "ALLOW") await moderationService.record({ targetType: "PROFILE", targetId: req.user._id, actor: req.user._id, result: bioModeration });
   return sendSuccess(res, { user: publicUser(req.user) }, "Profile updated");
 };
 

@@ -1,6 +1,7 @@
 const { sendSuccess } = require("../utils/http");
 const safetyService = require("../services/safety.service");
 const safetyCenter = require("../services/safety-center.service");
+const moderationService = require("../services/moderation.service");
 
 const block = async (req, res) =>
   sendSuccess(res, await safetyService.blockUser(req.user, req.params.userId, req), "User blocked");
@@ -38,6 +39,9 @@ const reviewReport = async (req, res) =>
   );
 
 const myReports = async (req, res) => sendSuccess(res, await safetyService.listMyReports(req.user, req.validatedQuery));
+const listModeration = async (req, res) => sendSuccess(res, await moderationService.listQueue(req.validatedQuery));
+const decideModeration = async (req, res) => sendSuccess(res, await moderationService.decide({ recordId: req.params.recordId, moderator: req.user, action: req.body.action, reason: req.body.reason, req }), "Moderation decision saved");
+const appealModeration = async (req, res) => sendSuccess(res, await moderationService.appeal({ recordId: req.params.recordId, user: req.user, reason: req.body.reason, req }), "Appeal submitted for moderator review", 202);
 const listContacts = async (req, res) => sendSuccess(res, { items: (await safetyCenter.contacts(req.user)).map((item) => ({ id: item._id.toString(), name: item.name, relationship: item.relationship, phone: item.phone, email: item.email, primary: item.primary, createdAt: item.createdAt, updatedAt: item.updatedAt })) });
 const addContact = async (req, res) => sendSuccess(res, { contact: await safetyCenter.saveContact(req.user, req.body, null, req) }, "Emergency contact saved", 201);
 const updateContact = async (req, res) => sendSuccess(res, { contact: await safetyCenter.saveContact(req.user, req.body, req.params.contactId, req) }, "Emergency contact updated");
@@ -47,4 +51,4 @@ const updateSettings = async (req, res) => sendSuccess(res, { settings: await sa
 const tripSafety = async (req, res) => sendSuccess(res, await safetyCenter.getTripSafety(req.params.tripId, req.user));
 const updateTripSafety = async (req, res) => sendSuccess(res, await safetyCenter.updateTripSafety(req.params.tripId, req.user, req.body, req), "Trip safety information updated");
 
-module.exports = { block, unblock, listBlocked, report, listReports, reviewReport, myReports, listContacts, addContact, updateContact, removeContact, settings, updateSettings, tripSafety, updateTripSafety };
+module.exports = { block, unblock, listBlocked, report, listReports, reviewReport, myReports, listModeration, decideModeration, appealModeration, listContacts, addContact, updateContact, removeContact, settings, updateSettings, tripSafety, updateTripSafety };

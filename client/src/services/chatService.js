@@ -25,7 +25,7 @@ const chatService = {
   async history(id, before) { return (await api.get(`/chat/conversations/${id}/messages`, { params: { limit: 40, ...(before ? { before } : {}) } })).data.data },
   async direct(connectionId) { return (await api.post('/chat/conversations/direct', { connectionId })).data.data.conversation },
   async trip(tripId) { return (await api.post(`/chat/trips/${tripId}/conversation`)).data.data.conversation },
-  async send(id, payload) { return (await api.post(`/chat/conversations/${id}/messages`, payload)).data.data.message },
+  async send(id, payload) { return (await api.post(`/chat/conversations/${id}/messages`, payload)).data.data },
   async markRead(id, upToMessageId) { return (await api.post(`/chat/conversations/${id}/read`, { ...(upToMessageId ? { upToMessageId } : {}) })).data.data },
   async unread() { return (await api.get('/chat/unread')).data.data },
   async connections() { return (await api.get('/connections', { params: { page: 1, limit: 50 } })).data.data.items },

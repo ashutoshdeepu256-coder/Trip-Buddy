@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Review = require("../models/Review");
 const ReviewReport = require("../models/ReviewReport");
+const ModerationRecord = require("../models/ModerationRecord");
 const ReviewReputation = require("./review-reputation.service");
 const Trip = require("../models/Trip");
 const TripMember = require("../models/TripMember");
@@ -8,6 +9,7 @@ const User = require("../models/User");
 const AuditLog = require("../models/AuditLog");
 const tripService = require("./trip.service");
 const { HttpError } = require("../utils/http");
+const moderationService = require("./moderation.service");
 
 const idOf = (value) => value?._id?.toString?.() || value?.toString?.() || "";
 const sanitizePlainText = (value = "") => value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim();
@@ -132,8 +134,13 @@ const eligibility = async (req, tripId) => {
 const create = async (req, data) => {
   assertEligibleAccount(req.user);
   if (idOf(req.user._id) === data.revieweeId) throw new HttpError(400, "You cannot review yourself", "SELF_REVIEW_FORBIDDEN");
+  const eligibleTrip = await loadCompletedTrip(data.tripId);
+  await assertParticipant(eligibleTrip, req.user._id);
+  await assertParticipant(eligibleTrip, data.revieweeId);
   const session = await mongoose.startSession();
   let review;
+  let moderationRecord = null;
+  const moderation = await moderationService.classify(data.comment, { actorId: req.user._id, contentType: "REVIEW" });
   try {
     await session.withTransaction(async () => {
       const trip = await loadCompletedTrip(data.tripId, session);
@@ -147,8 +154,9 @@ const create = async (req, data) => {
         trip: trip._id,
         rating: data.rating,
         comment: sanitizePlainText(data.comment),
-        status: "PUBLISHED",
+        status: moderation.recommendedAction === "HOLD" ? "HIDDEN" : "PUBLISHED",
       }], { session });
+      if (moderation.recommendedAction !== "ALLOW") moderationRecord = await moderationService.record({ targetType: "REVIEW", targetId: review._id, actor: req.user._id, result: moderation, session });
       await audit(req, { action: "REVIEW_CREATED", resourceType: "Review", resourceId: review._id, metadata: { tripId: idOf(trip._id), revieweeId: idOf(reviewee._id) }, session });
     });
   } catch (error) {
@@ -156,7 +164,7 @@ const create = async (req, data) => {
     throw error;
   } finally { await session.endSession(); }
   await review.populate([{ path: "author", select: "name" }, { path: "reviewee", select: "name" }, { path: "trip", select: "title privacy" }]);
-  return toPublicReview(review, { viewerId: idOf(req.user._id), showTrip: review.trip.privacy === "PUBLIC", includeStatus: true });
+  return { ...toPublicReview(review, { viewerId: idOf(req.user._id), showTrip: review.trip.privacy === "PUBLIC", includeStatus: true }), ...(moderationRecord && review.status === "HIDDEN" ? { appealId: idOf(moderationRecord._id) } : {}) };
 };
 
 const get = async (req, reviewId) => {
@@ -164,13 +172,17 @@ const get = async (req, reviewId) => {
     .populate("author", "name").populate("reviewee", "name").populate("trip", "title privacy").lean();
   if (!review) throw new HttpError(404, "Review was not found", "REVIEW_NOT_FOUND");
   const authorView = idOf(review.author?._id) === idOf(req.user?._id);
-  return toPublicReview(review, { viewerId: idOf(req.user?._id), showTrip: review.trip?.privacy === "PUBLIC" || authorView, includeStatus: authorView });
+  const moderationRecord = authorView && review.status === "HIDDEN" ? await ModerationRecord.findOne({ targetType: "REVIEW", targetId: review._id }).select("_id").lean() : null;
+  return { ...toPublicReview(review, { viewerId: idOf(req.user?._id), showTrip: review.trip?.privacy === "PUBLIC" || authorView, includeStatus: authorView }), ...(moderationRecord ? { appealId: idOf(moderationRecord._id) } : {}) };
 };
 
 const update = async (req, reviewId, data) => {
   assertEligibleAccount(req.user);
+  if (!(await Review.exists({ _id: reviewId, author: req.user._id, status: "PUBLISHED" }))) throw new HttpError(404, "Review was not found", "REVIEW_NOT_FOUND");
   const session = await mongoose.startSession();
   let review;
+  let moderationRecord = null;
+  const moderation = await moderationService.classify(data.comment, { actorId: req.user._id, contentType: "REVIEW" });
   try {
     await session.withTransaction(async () => {
       review = await Review.findOne({ _id: reviewId, author: req.user._id }).session(session);
@@ -181,12 +193,14 @@ const update = async (req, reviewId, data) => {
       if (review.editHistory.length > 20) review.editHistory.shift();
       review.rating = data.rating;
       review.comment = sanitizePlainText(data.comment);
+      if (moderation.recommendedAction === "HOLD") review.status = "HIDDEN";
       await review.save({ session });
+      if (moderation.recommendedAction !== "ALLOW") moderationRecord = await moderationService.record({ targetType: "REVIEW", targetId: review._id, actor: req.user._id, result: moderation, session });
       await audit(req, { action: "REVIEW_UPDATED", resourceType: "Review", resourceId: review._id, metadata: { previous, current: { rating: review.rating, comment: review.comment }, revisionCount: review.editHistory.length }, session });
     });
   } finally { await session.endSession(); }
   await review.populate([{ path: "author", select: "name" }, { path: "reviewee", select: "name" }, { path: "trip", select: "title privacy" }]);
-  return toPublicReview(review, { viewerId: idOf(req.user._id), showTrip: review.trip.privacy === "PUBLIC", includeStatus: true });
+  return { ...toPublicReview(review, { viewerId: idOf(req.user._id), showTrip: review.trip.privacy === "PUBLIC", includeStatus: true }), ...(moderationRecord && review.status === "HIDDEN" ? { appealId: idOf(moderationRecord._id) } : {}) };
 };
 
 const remove = async (req, reviewId) => {

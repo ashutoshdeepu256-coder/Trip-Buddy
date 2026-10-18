@@ -6,7 +6,10 @@ const summaryTraveller = async (req, res) => sendSuccess(res, await reviewServic
 const listTrip = async (req, res) => sendSuccess(res, await reviewService.list(req, { tripId: req.params.tripId, ...req.validatedQuery }));
 const summaryTrip = async (req, res) => sendSuccess(res, await reviewService.getSummary(req, { tripId: req.params.tripId }));
 const eligibility = async (req, res) => sendSuccess(res, await reviewService.eligibility(req, req.params.tripId));
-const create = async (req, res) => sendSuccess(res, await reviewService.create(req, req.body), "Review published", 201);
+const create = async (req, res) => {
+  const review = await reviewService.create(req, req.body);
+  return sendSuccess(res, review, review.status === "HIDDEN" ? "Review saved for safety review" : "Review published", review.status === "HIDDEN" ? 202 : 201);
+};
 const get = async (req, res) => sendSuccess(res, await reviewService.get(req, req.params.reviewId));
 const update = async (req, res) => sendSuccess(res, await reviewService.update(req, req.params.reviewId, req.body), "Review updated");
 const remove = async (req, res) => sendSuccess(res, await reviewService.remove(req, req.params.reviewId), "Review removed");

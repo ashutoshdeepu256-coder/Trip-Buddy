@@ -4,6 +4,7 @@ import { ArrowLeft, MessageCircle, Send } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { useChatStore } from '../store/chatStore'
 import chatService, { getChatSocket } from '../services/chatService'
+import safetyService from '../services/safetyService'
 import './ChatPage.css'
 
 const apiError = (error) => error.response?.data?.error?.message || error.message || 'Chat is temporarily unavailable.'
@@ -27,6 +28,8 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false)
   const [text, setText] = useState('')
   const [error, setError] = useState('')
+  const [appealId, setAppealId] = useState('')
+  const [appealReason, setAppealReason] = useState('')
   const [typingUser, setTypingUser] = useState('')
   const [online, setOnline] = useState(false)
   const socketRef = useRef(null)
@@ -86,6 +89,7 @@ export default function ChatPage() {
     const onDelivered = (event) => setMessages((items) => items.map((message) => message.id === event.messageId
       ? { ...message, deliveredTo: [...new Set([...(message.deliveredTo || []), ...event.deliveredTo])] }
       : message))
+    const onHidden = (event) => setMessages((items) => items.filter((message) => message.id !== event.messageId || message.conversationId !== event.conversationId))
     const onRead = (event) => setMessages((items) => {
       const cutoffIndex = event.upToMessageId ? items.findIndex((message) => message.id === event.upToMessageId) : items.length - 1
       return items.map((message, index) => message.conversationId === event.conversationId && cutoffIndex >= 0 && index <= cutoffIndex
@@ -105,6 +109,7 @@ export default function ChatPage() {
     socket.on('connect_error', onConnectError)
     socket.on('chat:message:new', onMessage)
     socket.on('chat:message:delivered', onDelivered)
+    socket.on('chat:message:hidden', onHidden)
     socket.on('chat:message:read', onRead)
     socket.on('chat:typing', onTyping)
     setOnline(socket.connected)
@@ -114,6 +119,7 @@ export default function ChatPage() {
       socket.off('connect_error', onConnectError)
       socket.off('chat:message:new', onMessage)
       socket.off('chat:message:delivered', onDelivered)
+      socket.off('chat:message:hidden', onHidden)
       socket.off('chat:message:read', onRead)
       socket.off('chat:typing', onTyping)
       if (typingTimer.current) clearTimeout(typingTimer.current)
@@ -196,20 +202,38 @@ export default function ChatPage() {
     setError('')
     const payload = { text: content, idempotencyKey: makeKey() }
     try {
-      let message
+      let result
       if (socketRef.current?.connected) {
         try {
-          const result = await chatService.socketRequest(socketRef.current, 'chat:message:send', { conversationId: activeId, ...payload })
-          message = result.message
+          result = await chatService.socketRequest(socketRef.current, 'chat:message:send', { conversationId: activeId, ...payload })
         } catch {
-          message = await chatService.send(activeId, payload)
+          result = await chatService.send(activeId, payload)
         }
-      } else message = await chatService.send(activeId, payload)
+      } else result = await chatService.send(activeId, payload)
+      if (result.held) {
+        setError(result.detail || 'Your message is held for safety review and was not delivered.')
+        setAppealId(result.appealId || '')
+        setAppealReason('')
+        setText('')
+        return
+      }
+      const message = result.message
       setMessages((items) => withMessage(items, message))
       setText('')
       void loadConversations()
     } catch (requestError) { setError(apiError(requestError)) }
     finally { setSending(false) }
+  }
+
+  const submitAppeal = async (event) => {
+    event.preventDefault()
+    if (!appealId || appealReason.trim().length < 10) return
+    try {
+      await safetyService.appealModeration(appealId, appealReason.trim())
+      setAppealId('')
+      setAppealReason('')
+      setError('Your appeal was sent for moderator review.')
+    } catch (requestError) { setError(apiError(requestError)) }
   }
 
   const active = conversations.find((item) => item.id === activeId)
@@ -218,6 +242,7 @@ export default function ChatPage() {
   return <main className="chat-page">
     <header className="chat-header"><Link to="/" className="chat-brand">TripBuddy</Link><h1>Messages</h1><nav><Link to="/connections">Connections</Link><span className={online ? 'chat-connection online' : 'chat-connection'}>{online ? 'Connected' : 'Reconnecting…'}</span></nav></header>
     {error && <p className="chat-error" role="alert">{error}</p>}
+    {appealId && <form className="chat-appeal" onSubmit={submitAppeal}><label htmlFor="message-appeal">Add context for a moderator</label><textarea id="message-appeal" minLength="10" maxLength="500" required value={appealReason} onChange={(event) => setAppealReason(event.target.value)} /><button type="submit" disabled={appealReason.trim().length < 10}>Appeal held message</button></form>}
     <div className="chat-layout">
       <aside className={`chat-sidebar ${activeId ? 'has-active' : ''}`} aria-label="Conversations">
         <div className="chat-sidebar-heading"><h2>Conversations</h2><span>{conversations.reduce((sum, item) => sum + item.unreadCount, 0)} unread</span></div>

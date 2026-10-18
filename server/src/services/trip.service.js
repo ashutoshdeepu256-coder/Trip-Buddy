@@ -5,6 +5,7 @@ const TripMember = require("../models/TripMember");
 const { HttpError } = require("../utils/http");
 const { publishTripSchema } = require("../validators/trip.validator");
 const tripImages = require("./trip-image.service");
+const moderationService = require("./moderation.service");
 
 const destinationProjection = "name slug country state city images coordinates description bestMonths estimatedBudget activities popularPlaces travelInformation";
 const creatorProjection = "name profile.city profile.country verification.email.status verification.phone.status verification.identity.status createdAt";
@@ -139,6 +140,7 @@ const hasActiveMembership = async (tripId, userId) =>
 const createTrip = async (user, values) => {
   const data = updateFields(values);
   if (data.destination) data.destination = await validateDestination(data.destination);
+  const moderation = await moderationService.classify(`${data.title || ""}\n${data.description || ""}`, { actorId: user._id, contentType: "TRIP" });
   const trip = await Trip.create({ ...data, creator: user._id, status: "DRAFT" });
   try {
     await TripMember.create({
@@ -152,6 +154,7 @@ const createTrip = async (user, values) => {
     await Trip.deleteOne({ _id: trip._id });
     throw error;
   }
+  if (moderation.recommendedAction !== "ALLOW") await moderationService.record({ targetType: "TRIP", targetId: trip._id, actor: user._id, result: moderation });
   return serializeTrip(trip, { includeLocation: true });
 };
 
@@ -192,8 +195,11 @@ const updateTrip = async (tripId, user, values) => {
   if (Object.hasOwn(data, "destination") && data.destination) {
     data.destination = await validateDestination(data.destination);
   }
+  const contentChanged = Object.hasOwn(data, "title") || Object.hasOwn(data, "description");
+  const moderation = contentChanged ? await moderationService.classify(`${data.title ?? trip.title ?? ""}\n${data.description ?? trip.description ?? ""}`, { actorId: user._id, contentType: "TRIP" }) : null;
   Object.assign(trip, data);
   await trip.save();
+  if (moderation?.recommendedAction !== "ALLOW") await moderationService.record({ targetType: "TRIP", targetId: trip._id, actor: user._id, result: moderation });
   return getAccessibleTrip(trip._id, user);
 };
 

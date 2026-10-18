@@ -10,8 +10,8 @@ const history = async (req, res) => sendSuccess(res, await chatService.history(r
 const send = async (req, res) => {
   const result = await chatService.createMessage(req.params.conversationId, req.user._id, req.body, req);
   const io = req.app.get("io");
-  if (io) await realtime.broadcastMessage(io, result.message, result.recipients);
-  return sendSuccess(res, { message: result.message }, result.duplicate ? "Message already sent" : "Message sent", result.duplicate ? 200 : 201);
+  if (result.message && io) await realtime.broadcastMessage(io, result.message, result.recipients);
+  return sendSuccess(res, result.held ? { held: true, detail: "Your message is held for safety review and was not delivered.", appealId: result.appealId } : { message: result.message }, result.held ? "Message held for review" : result.duplicate ? "Message already sent" : "Message sent", result.held ? 202 : result.duplicate ? 200 : 201);
 };
 const read = async (req, res) => {
   const result = await chatService.markRead(req.params.conversationId, req.user._id, req.body.upToMessageId);

@@ -14,6 +14,8 @@ function SafetyCenter() {
   const [contacts, setContacts] = useState([])
   const [reports, setReports] = useState([])
   const [moderatorReports, setModeratorReports] = useState([])
+  const [moderationItems, setModerationItems] = useState([])
+  const [moderationFilter, setModerationFilter] = useState('OPEN')
   const [moderatorAccess, setModeratorAccess] = useState(false)
   const [contact, setContact] = useState(emptyContact)
   const [editingContact, setEditingContact] = useState(null)
@@ -35,11 +37,13 @@ function SafetyCenter() {
     try {
       const queue = await safetyService.moderatorReports()
       setModeratorReports(queue.items || queue)
+      const moderationQueue = await safetyService.moderationQueue(moderationFilter)
+      setModerationItems(moderationQueue.items || [])
       setModeratorAccess(true)
     } catch (requestError) {
       if (requestError.response?.status !== 403) setModeratorAccess(false)
     }
-  }, [])
+  }, [moderationFilter])
 
   useEffect(() => {
     let active = true
@@ -77,6 +81,12 @@ function SafetyCenter() {
   const moderate = (id, status) => perform(async () => {
     await safetyService.resolveReport(id, { status, moderatorNotes: moderatorNotes[id] || '' })
   }, 'Report status updated.')
+
+  const decideModeration = (item, action) => {
+    const reason = moderatorNotes[item.id]?.trim()
+    if (!reason || reason.length < 3) { setError('Enter a short reason before saving a moderation decision.'); return }
+    perform(() => safetyService.decideModeration(item.id, { action, reason }), 'Moderation decision saved.')
+  }
 
   return (
     <main className="app-shell inner-shell safety-center">
@@ -152,6 +162,13 @@ function SafetyCenter() {
         {moderatorAccess && <section className="safety-section">
           <h2>Moderator report queue</h2>
           {!moderatorReports.length ? <p className="muted-copy">No reports are awaiting review.</p> : <ul className="safety-list moderator-list">{moderatorReports.map((item) => <li key={item.id}><div><strong>{item.targetType} · {item.reason}</strong><small>{item.description}</small><small>Reported by {item.reporter?.name || 'traveller'} · {item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</small><textarea aria-label="Private moderator notes" maxLength="2000" value={moderatorNotes[item.id] || ''} onChange={(event) => setModeratorNotes({ ...moderatorNotes, [item.id]: event.target.value })} placeholder="Private moderator notes" /></div><div className="safety-actions"><button type="button" onClick={() => moderate(item.id, 'UNDER_REVIEW')}>Review</button><button type="button" onClick={() => moderate(item.id, 'RESOLVED')}>Resolve</button><button type="button" onClick={() => moderate(item.id, 'DISMISSED')}>Dismiss</button></div></li>)}</ul>}
+        </section>}
+
+        {moderatorAccess && <section className="safety-section">
+          <h2>Content safety review</h2>
+          <p className="safety-note">Classifier results are review signals, not findings of fact. Decisions are audited; account suspensions are not automated here.</p>
+          <label>Queue<select value={moderationFilter} onChange={(event) => setModerationFilter(event.target.value)}><option value="OPEN">Open items</option><option value="ALL">Open, in review, and escalated</option></select></label>
+          {!moderationItems.length ? <p className="muted-copy">No content safety items are awaiting review.</p> : <ul className="safety-list moderator-list">{moderationItems.map((item) => <li key={item.id}><div><strong>{item.targetType.replaceAll('_', ' ')} · {item.severity} · {Math.round(item.confidence * 100)}% confidence</strong><small>{item.categories.join(', ') || 'No categories'} · {item.reasonCodes.join(', ') || 'No rule codes'} · {item.provider}</small>{item.target?.text && <p>{item.target.text}</p>}{item.appealReason && <small>Appeal: {item.appealReason}</small>}<textarea aria-label="Moderation decision reason" maxLength="500" minLength="3" value={moderatorNotes[item.id] || ''} onChange={(event) => setModeratorNotes({ ...moderatorNotes, [item.id]: event.target.value })} placeholder="Reason required for this decision" /></div><div className="safety-actions"><button type="button" disabled={busy} onClick={() => decideModeration(item, 'ALLOW')}>Allow</button><button type="button" disabled={busy} onClick={() => decideModeration(item, 'FLAG')}>Dismiss flag</button>{['MESSAGE', 'REVIEW'].includes(item.targetType) && <button type="button" disabled={busy} onClick={() => decideModeration(item, 'HIDE')}>Hide</button>}{['MESSAGE', 'REVIEW'].includes(item.targetType) && <button type="button" disabled={busy} onClick={() => decideModeration(item, 'RESTORE')}>Restore</button>}<button type="button" disabled={busy} onClick={() => decideModeration(item, 'ESCALATE')}>Escalate</button></div></li>)}</ul>}
         </section>}
 
         <section className="safety-section">

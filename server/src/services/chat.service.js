@@ -10,6 +10,7 @@ const { HttpError } = require("../utils/http");
 const { recordAudit } = require("./audit.service");
 const { takeUserLimit } = require("./chat-rate-limit.service");
 const notificationService = require("./notification.service");
+const moderationService = require("./moderation.service");
 
 const idOf = (value) => value?._id?.toString?.() || value?.toString?.() || "";
 const openTripStatuses = ["PUBLISHED", "PLANNING", "CONFIRMED", "ONGOING"];
@@ -114,6 +115,7 @@ const countUnread = async (conversation, actorId, joinedAt) => {
   if (!senders.length) return 0;
   return Message.countDocuments({
     conversation: conversation._id,
+    moderationStatus: "ALLOWED",
     sender: { $in: senders, $ne: actorId },
     readBy: { $ne: actorId },
     ...(joinedAt ? { createdAt: { $gte: joinedAt } } : {}),
@@ -218,7 +220,7 @@ const history = async (conversationId, actorId, { limit, before }) => {
     cursorFilter = { $or: [{ createdAt: { $lt: cursor.createdAt } }, { createdAt: cursor.createdAt, _id: { $lt: cursor._id } }] };
   }
   const senders = await visibleSenderIds(conversation, actorId);
-  const query = { conversation: conversation._id, sender: { $in: senders }, ...(joinedAt ? { createdAt: { $gte: joinedAt } } : {}), ...cursorFilter };
+  const query = { conversation: conversation._id, moderationStatus: "ALLOWED", sender: { $in: senders }, ...(joinedAt ? { createdAt: { $gte: joinedAt } } : {}), ...cursorFilter };
   const rows = await Message.find(query).sort({ createdAt: -1, _id: -1 }).limit(limit + 1).lean();
   const hasMore = rows.length > limit;
   const items = rows.slice(0, limit).reverse().map(serializeMessage);
@@ -238,6 +240,13 @@ const messageRecipients = async (conversation, senderId) => {
   return users.map((user) => user._id).filter((id) => !hidden.has(idOf(id)));
 };
 
+const ensureHeldModerationRecord = async (message, actorId) => {
+  const ModerationRecord = require("../models/ModerationRecord");
+  if (await ModerationRecord.exists({ targetType: "MESSAGE", targetId: message._id })) return;
+  const result = moderationService.deterministicClassify(message.text);
+  await moderationService.record({ targetType: "MESSAGE", targetId: message._id, actor: actorId, result });
+};
+
 const createMessage = async (conversationId, actorId, { text, idempotencyKey }, req, io = null) => {
   const { conversation, joinedAt } = await requireConversation(conversationId, actorId);
   const normalizedText = text.trim();
@@ -245,6 +254,14 @@ const createMessage = async (conversationId, actorId, { text, idempotencyKey }, 
   const existing = await Message.findOne({ sender: actorId, idempotencyKey }).lean();
   if (existing) {
     if (idOf(existing.conversation) !== idOf(conversation._id)) throw new HttpError(409, "Idempotency key was already used", "IDEMPOTENCY_CONFLICT");
+    if (existing.moderationStatus === "HELD" || existing.moderationStatus === "HIDDEN") {
+      let appealId = null;
+      if (existing.moderationStatus === "HELD") {
+        await ensureHeldModerationRecord(existing, actorId);
+        appealId = (await require("../models/ModerationRecord").findOne({ targetType: "MESSAGE", targetId: existing._id }).select("_id").lean())?._id?.toString() || null;
+      }
+      return { message: null, recipients: [], duplicate: true, held: true, appealId };
+    }
     const recipients = await messageRecipients(conversation, actorId);
     await notificationService.notifyMessage({ conversationId: conversation._id, senderId: actorId, recipients, messageId: existing._id, io, req });
     return { message: serializeMessage(existing), recipients, duplicate: true };
@@ -253,16 +270,34 @@ const createMessage = async (conversationId, actorId, { text, idempotencyKey }, 
     throw new HttpError(429, "Message rate limit reached", "RATE_LIMITED");
   }
   if (joinedAt && new Date() < joinedAt) throw notFound();
+  const moderation = await moderationService.classify(normalizedText, { actorId, contentType: "MESSAGE" });
+  if (moderation.recommendedAction === "HOLD") {
+    // The content is retained only as the message itself for moderator review; it is not delivered.
+  }
   let message;
   try {
-    message = await Message.create({ conversation: conversation._id, sender: actorId, text: normalizedText, idempotencyKey });
+    message = await Message.create({ conversation: conversation._id, sender: actorId, text: normalizedText, idempotencyKey, moderationStatus: moderation.recommendedAction === "HOLD" ? "HELD" : "ALLOWED" });
   } catch (error) {
     if (error.code !== 11000) throw error;
     message = await Message.findOne({ sender: actorId, idempotencyKey }).lean();
     if (!message || idOf(message.conversation) !== idOf(conversation._id)) throw new HttpError(409, "Idempotency key was already used", "IDEMPOTENCY_CONFLICT");
+    if (message.moderationStatus === "HELD" || message.moderationStatus === "HIDDEN") {
+      let appealId = null;
+      if (message.moderationStatus === "HELD") {
+        await ensureHeldModerationRecord(message, actorId);
+        appealId = (await require("../models/ModerationRecord").findOne({ targetType: "MESSAGE", targetId: message._id }).select("_id").lean())?._id?.toString() || null;
+      }
+      return { message: null, recipients: [], duplicate: true, held: true, appealId };
+    }
     const recipients = await messageRecipients(conversation, actorId);
     await notificationService.notifyMessage({ conversationId: conversation._id, senderId: actorId, recipients, messageId: message._id, io, req });
     return { message: serializeMessage(message), recipients, duplicate: true };
+  }
+  if (moderation.recommendedAction !== "ALLOW") await moderationService.record({ targetType: "MESSAGE", targetId: message._id, actor: actorId, result: moderation });
+  if (moderation.recommendedAction === "HOLD") {
+    if (req) await recordAudit(req, { action: "CHAT_MESSAGE_HELD", resourceType: "Message", resourceId: message._id, metadata: { reasonCodes: moderation.reasonCodes } });
+    const moderationRecord = await require("../models/ModerationRecord").findOne({ targetType: "MESSAGE", targetId: message._id }).select("_id").lean();
+    return { message: null, recipients: [], duplicate: false, held: true, appealId: moderationRecord?._id?.toString() || null };
   }
   await Conversation.updateOne({ _id: conversation._id, status: "ACTIVE" }, { $set: { lastMessage: message._id, lastMessageAt: message.createdAt } });
   if (req) await recordAudit(req, { action: "CHAT_MESSAGE_SENT", resourceType: "Message", resourceId: message._id });
@@ -280,7 +315,7 @@ const markRead = async (conversationId, actorId, upToMessageId) => {
     cutoff = target.createdAt;
   }
   const senders = await visibleSenderIds(conversation, actorId);
-  const filter = { conversation: conversation._id, sender: { $in: senders, $ne: actorId }, createdAt: { $lte: cutoff }, readBy: { $ne: actorId }, ...(joinedAt ? { createdAt: { $gte: joinedAt, $lte: cutoff } } : {}) };
+  const filter = { conversation: conversation._id, moderationStatus: "ALLOWED", sender: { $in: senders, $ne: actorId }, createdAt: { $lte: cutoff }, readBy: { $ne: actorId }, ...(joinedAt ? { createdAt: { $gte: joinedAt, $lte: cutoff } } : {}) };
   const updated = await Message.updateMany(filter, { $addToSet: { readBy: actorId } });
   await Conversation.updateOne({ _id: conversation._id }, { $set: { "participants.$[participant].lastReadAt": cutoff } }, { arrayFilters: [{ "participant.user": actorId, "participant.status": "ACTIVE" }] });
   return { conversationId: idOf(conversation._id), upToMessageId: upToMessageId || null, updatedCount: updated.modifiedCount, readAt: new Date() };

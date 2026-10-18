@@ -93,6 +93,16 @@ const broadcastMessage = async (io, message, recipients) => {
   }
 };
 
+const broadcastModerationHide = async (io, message) => {
+  const targets = [message.sender, ...await chatService.messageRecipients(message.conversation, message.sender)];
+  for (const userId of targets) {
+    try {
+      await chatService.requireConversation(message.conversation, userId);
+      await emitAuthorized(io, userId, "chat:message:hidden", { conversationId: message.conversation.toString(), messageId: message._id.toString() }, message.conversation.toString());
+    } catch { /* Recheck authorization for each connected participant. */ }
+  }
+};
+
 const broadcastRead = async (io, receipt, readerId) => {
   let conversation;
   try { conversation = await chatService.requireConversation(receipt.conversationId, readerId); } catch { return; }
@@ -146,8 +156,8 @@ const createChatSocket = (httpServer, app) => {
         get: (name) => socket.handshake.headers[name.toLowerCase()],
       };
       const result = await chatService.createMessage(data.conversationId, actor._id, data, auditRequest, socket.nsp.server);
-      await broadcastMessage(io, result.message, result.recipients);
-      return { message: result.message, duplicate: result.duplicate };
+      if (result.message) await broadcastMessage(io, result.message, result.recipients);
+      return result.held ? { held: true, detail: "Your message is held for safety review and was not delivered.", appealId: result.appealId, duplicate: result.duplicate } : { message: result.message, duplicate: result.duplicate };
     }));
     socket.on("chat:read", (payload, ack) => ackRun(socket, ack, async () => {
       const actor = await refreshSocketActor(socket);
@@ -233,4 +243,4 @@ const createChatSocket = (httpServer, app) => {
   return io;
 };
 
-module.exports = { createChatSocket, broadcastMessage, broadcastRead };
+module.exports = { createChatSocket, broadcastMessage, broadcastRead, broadcastModerationHide };
