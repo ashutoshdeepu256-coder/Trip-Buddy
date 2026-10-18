@@ -4,13 +4,17 @@ import { useAuthStore } from '../store/authStore'
 import adminService from '../services/adminService'
 import './AdminPanel.css'
 
-const tabs = ['Overview', 'Users', 'Trips', 'Audit']
+const tabs = ['Overview', 'Analytics', 'Users', 'Trips', 'Audit']
 const date = (value) => value ? new Date(value).toLocaleString() : '—'
 
 function AdminPanel() {
   const user = useAuthStore((state) => state.user)
   const [tab, setTab] = useState('Overview')
   const [overview, setOverview] = useState(null)
+  const [analytics, setAnalytics] = useState(null)
+  const [analyticsWindow, setAnalyticsWindow] = useState('30d')
+  const [analyticsFrom, setAnalyticsFrom] = useState('')
+  const [analyticsTo, setAnalyticsTo] = useState('')
   const [page, setPage] = useState(1)
   const [data, setData] = useState(null)
   const [search, setSearch] = useState('')
@@ -30,6 +34,19 @@ function AdminPanel() {
           const result = await adminService.overview()
           if (!cancelled) setOverview(result)
         }
+        if (tab === 'Analytics') {
+          if (analyticsWindow === 'custom' && (!analyticsFrom || !analyticsTo)) {
+            if (!cancelled) { setAnalytics(null); setLoading(false) }
+            return
+          }
+          const customTo = analyticsWindow === 'custom' ? new Date(`${analyticsTo}T00:00:00.000Z`) : null
+          if (customTo) customTo.setUTCDate(customTo.getUTCDate() + 1)
+          const params = analyticsWindow === 'custom'
+            ? { from: new Date(`${analyticsFrom}T00:00:00.000Z`).toISOString(), to: customTo.toISOString() }
+            : { window: analyticsWindow }
+          const result = await adminService.analytics(params)
+          if (!cancelled) setAnalytics(result)
+        }
         if (tab === 'Users') {
           const result = await adminService.users({ page, limit: 15, search: search || undefined, status: filter || undefined })
           if (!cancelled) setData(result)
@@ -48,7 +65,7 @@ function AdminPanel() {
     }
     const timer = window.setTimeout(load, 0)
     return () => { cancelled = true; window.clearTimeout(timer) }
-  }, [user?.role, tab, page, search, filter, refresh])
+  }, [user?.role, tab, page, search, filter, refresh, analyticsWindow, analyticsFrom, analyticsTo])
 
   const switchTab = (next) => { setTab(next); setPage(1); setData(null); setFilter(''); setSearch(''); setNotice('') }
   const moderateUser = async (person) => {
@@ -87,6 +104,7 @@ function AdminPanel() {
       <div className="admin-links"><Link to="/safety">Safety Center <span>Reports, review reports, and moderation queues: {overview.safety.pendingReports} pending reports · {overview.safety.openReviewReports} open review reports</span></Link></div>
       <p className="admin-footnote">Payment figures are status counts only. Provider identifiers, credentials, and payment details are not shown.</p>
     </>}
+    {!loading && tab === 'Analytics' && <AnalyticsView data={analytics} window={analyticsWindow} from={analyticsFrom} to={analyticsTo} onWindow={setAnalyticsWindow} onFrom={setAnalyticsFrom} onTo={setAnalyticsTo} />}
     {!loading && ['Users', 'Trips'].includes(tab) && <>
       <div className="admin-filters"><label>Search {tab.toLowerCase()}<input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder={tab === 'Users' ? 'Name or email prefix' : 'Trip title'} /></label><label>Status<select value={filter} onChange={(event) => { setFilter(event.target.value); setPage(1) }}><option value="">All statuses</option>{(tab === 'Users' ? ['ACTIVE', 'SUSPENDED', 'BANNED'] : ['DRAFT', 'PUBLISHED', 'PLANNING', 'CONFIRMED', 'ONGOING', 'COMPLETED', 'CANCELLED']).map((value) => <option key={value}>{value}</option>)}</select></label></div>
       {tab === 'Users' ? <UserTable rows={data?.items || []} selfId={user.id} onStatus={moderateUser} onRole={changeRole} /> : <TripTable rows={data?.items || []} />}
@@ -98,6 +116,67 @@ function AdminPanel() {
 }
 
 function Metric({ label, value, detail }) { return <article className="admin-metric"><span>{label}</span><strong>{value}</strong><small>{detail}</small></article> }
+function AnalyticsView({ data, window, from, to, onWindow, onFrom, onTo }) {
+  const metrics = data?.metrics || {}
+  const groups = [
+    { title: 'Users', items: [['Registrations', 'usersRegistered'], ['Account status changes', 'accountStatusChanges']] },
+    { title: 'Trips and participation', items: [['Trips created', 'tripsCreated'], ['Trips published', 'tripsPublished'], ['Trips completed', 'tripsCompleted'], ['Trips cancelled', 'tripsCancelled'], ['Membership joins', 'membershipsJoined']] },
+    { title: 'Connections and engagement', items: [['Connection requests', 'connectionRequests'], ['Connection acceptances', 'connectionAcceptances'], ['Conversations created', 'conversationsCreated'], ['Messages created (content not read)', 'messagesCreated']] },
+    { title: 'Itinerary usage', items: [['Itineraries created', 'itinerariesCreated'], ['Generation audit events', 'itineraryGenerations'], ['Gemini generated', 'geminiItinerariesCreated'], ['Fallback generated', 'fallbackItinerariesCreated']] },
+    { title: 'Bookings, expenses and payments', items: [['Booking records', 'bookingsCreated'], ['External handoff records', 'bookingExternalHandoffs'], ['Expense records', 'expensesCreated'], ['Settlements recorded', 'settlementsRecorded'], ['Provider verified settlements', 'providerVerifiedSettlements'], ['User reported settlements', 'userReportedSettlements'], ['Payment attempts', 'paymentAttemptsCreated'], ['Provider verified successes', 'paymentVerifiedSuccesses'], ['Provider verified failures', 'paymentVerifiedFailures'], ['Provider refund events', 'paymentRefundEvents']] },
+    { title: 'Reviews and moderation', items: [['Reviews created', 'reviewsCreated'], ['Reviews moderated', 'reviewsModerated'], ['Safety reports', 'safetyReportsCreated'], ['Review reports', 'reviewReportsCreated'], ['Review reports resolved', 'reviewReportsResolved'], ['Moderation records', 'moderationRecordsCreated'], ['Moderation decisions', 'moderationDecisions']] },
+    { title: 'AI assistant', items: [['Assistant replies', 'assistantReplies'], ['Gemini replies', 'assistantReplies.bySource.GEMINI'], ['Fallback replies', 'assistantReplies.bySource.DETERMINISTIC_FALLBACK']] },
+    { title: 'Moderation classifier records', items: [['Rules records', 'moderationClassifierProviders.RULES'], ['Gemini records', 'moderationClassifierProviders.GEMINI'], ['Unavailable provider records', 'moderationClassifierProviders.UNAVAILABLE']] },
+    { title: 'Notifications', items: [['Notification records persisted', 'notificationPersistence']] },
+  ]
+  const resolve = (key) => key.split('.').reduce((value, part) => value?.[part], metrics)
+  const dateLabel = data?.period ? `${new Date(data.period.from).toLocaleString('en-US', { timeZone: 'UTC' })} – ${new Date(data.period.to).toLocaleString('en-US', { timeZone: 'UTC' })} UTC` : 'Choose a complete range to load analytics.'
+  const fallbackShare = metrics.assistantFallbackShare
+  const renderMetric = ([label, key]) => {
+    const metric = resolve(key)
+    if (key === 'notificationPersistence') {
+      return metric?.available
+        ? <SeriesChart key={key} label={label} points={metric.values || []} />
+        : <Metric key={key} label={label} value="Unavailable" detail={metric?.reason} />
+    }
+    if (['accountStatusChanges', 'bookingExternalHandoffs', 'connectionAcceptances'].includes(key) && metric?.values) {
+      return <div key={key} className="analytics-coverage"><small>{metric.coverage || metric.semantics}</small><SeriesChart label={label} points={metric.values} /></div>
+    }
+    return <SeriesChart key={key} label={label} points={Array.isArray(metric) ? metric : []} />
+  }
+  return <section className="analytics-view">
+    <div className="admin-filters analytics-period">
+      <label>Time window<select value={window} onChange={(event) => onWindow(event.target.value)}><option value="24h">Last 24 hours</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option><option value="custom">Custom range (up to 90 days)</option></select></label>
+      {window === 'custom' && <>
+        <label>From date<input type="date" value={from} onChange={(event) => onFrom(event.target.value)} /></label>
+        <label>Through date<input type="date" value={to} onChange={(event) => onTo(event.target.value)} /></label>
+      </>}
+    </div>
+    <p className="admin-footnote">{dateLabel}. Bucket times are UTC. Counts reflect source-record timestamps; they are not deduplicated business conversions.</p>
+    {data && <>
+      <div className="admin-metrics">
+        <Metric label="Eligible accounts now" value={metrics.currentEligibleUsers?.value ?? 'Unavailable'} detail="Current ACTIVE account status; not historical eligibility." />
+        <Metric label="Fallback assistant share" value={fallbackShare?.available ? `${(fallbackShare.value * 100).toFixed(1)}%` : 'Unavailable'} detail={fallbackShare?.available ? `${fallbackShare.numerator} fallback replies / ${fallbackShare.denominator} assistant replies` : fallbackShare?.reason} />
+        <Metric label="Provider failure rate" value="Not instrumented" detail={metrics.assistantProviderFailureRate?.reason} />
+        <Metric label="Notification delivery" value="Not instrumented" detail={metrics.notificationDelivery?.reason} />
+        <Metric label="Itinerary fallback share" value={metrics.itineraryFallbackShare?.available ? `${(metrics.itineraryFallbackShare.value * 100).toFixed(1)}%` : 'Unavailable'} detail={metrics.itineraryFallbackShare?.available ? `${metrics.itineraryFallbackShare.numerator} fallback / ${metrics.itineraryFallbackShare.denominator} itinerary records` : metrics.itineraryFallbackShare?.reason} />
+      </div>
+      {groups.map((group) => (
+        <section className="analytics-group" key={group.title}>
+          <h2>{group.title}</h2>
+          <div className="analytics-grid">{group.items.map(renderMetric)}</div>
+        </section>
+      ))}
+      <p className="admin-footnote">{metrics.historicalEligibleUsers?.reason} Notification counts mean persisted records, not confirmed device delivery. External handoffs do not indicate that a reservation was completed.</p>
+    </>}
+  </section>
+}
+function SeriesChart({ label, points }) {
+  const max = Math.max(1, ...points.map((point) => point.count))
+  return <figure className="analytics-chart" aria-label={`${label} time series`}><figcaption>{label}<strong>{points.reduce((sum, point) => sum + point.count, 0)}</strong></figcaption><div className="analytics-bars" role="img" aria-label={`${label}, ${points.length} UTC time buckets`}>
+    {points.map((point) => <span key={point.at} title={`${new Date(point.at).toLocaleString('en-US', { timeZone: 'UTC' })} UTC: ${point.count}`} style={{ height: `${Math.max(point.count ? 4 : 1, (point.count / max) * 100)}%` }} />)}
+  </div><div className="analytics-axis"><span>{points[0]?.at ? new Date(points[0].at).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '—'}</span><span>{points.at(-1)?.at ? new Date(points.at(-1).at).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '—'}</span></div></figure>
+}
 function CountCard({ title, values }) { return <article className="admin-count-card"><h2>{title}</h2>{Object.entries(values || {}).map(([key, value]) => <div key={key}><span>{key.replaceAll('_', ' ').toLowerCase()}</span><strong>{value}</strong></div>)}</article> }
 function UserTable({ rows, selfId, onStatus, onRole }) { return <div className="admin-table-wrap"><table><thead><tr><th>User</th><th>Role</th><th>Status</th><th>Profile</th><th>Created</th><th>Actions</th></tr></thead><tbody>{rows.map((person) => <tr key={person.id}><td>{person.name}<small>{person.email}</small></td><td><select aria-label={`Role for ${person.name}`} disabled={person.id === selfId} value={person.role} onChange={(event) => onRole(person, event.target.value)}>{['USER', 'MODERATOR', 'ADMIN'].map((role) => <option key={role}>{role}</option>)}</select></td><td><span className={`admin-status status-${person.accountStatus.toLowerCase()}`}>{person.accountStatus}</span></td><td>{[person.profile.city, person.profile.country].filter(Boolean).join(', ') || '—'}</td><td>{date(person.createdAt)}</td><td><button type="button" disabled={person.id === selfId || (person.role === 'ADMIN' && person.accountStatus === 'ACTIVE')} onClick={() => onStatus(person)}>{person.accountStatus === 'ACTIVE' ? 'Suspend' : 'Restore'}</button></td></tr>)}</tbody></table></div> }
 function TripTable({ rows }) { return <div className="admin-table-wrap"><table><thead><tr><th>Trip</th><th>Creator</th><th>Status</th><th>Visibility</th><th>Moderation</th><th>Dates</th><th>Created</th></tr></thead><tbody>{rows.map((trip) => <tr key={trip.id}><td>{trip.title || 'Untitled'}<small>{trip.description.slice(0, 140)}</small></td><td>{trip.creator?.name || 'Unknown'}</td><td><span className="admin-status">{trip.status}</span></td><td>{trip.privacy}</td><td>{trip.moderationVisibility || 'VISIBLE'}</td><td>{date(trip.startDate)}<small>to {date(trip.endDate)}</small></td><td>{date(trip.createdAt)}</td></tr>)}</tbody></table></div> }

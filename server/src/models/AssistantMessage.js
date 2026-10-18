@@ -17,6 +17,7 @@ const assistantMessageSchema = new mongoose.Schema({
 assistantMessageSchema.index({ conversation: 1, createdAt: -1, _id: -1 });
 assistantMessageSchema.index({ conversation: 1, requestId: 1 }, { unique: true, partialFilterExpression: { requestId: { $type: "string" } } });
 assistantMessageSchema.index({ conversation: 1, responseToRequestId: 1 }, { unique: true, partialFilterExpression: { responseToRequestId: { $type: "string" } } });
+assistantMessageSchema.index({ role: 1, source: 1, createdAt: 1 });
 assistantMessageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 module.exports = mongoose.models.AssistantMessage || mongoose.model("AssistantMessage", assistantMessageSchema);

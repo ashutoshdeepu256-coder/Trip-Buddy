@@ -38,5 +38,6 @@ connectionSchema.index(
 connectionSchema.index({ requester: 1, status: 1, createdAt: -1 });
 connectionSchema.index({ recipient: 1, status: 1, createdAt: -1 });
 connectionSchema.index({ trip: 1, status: 1 });
+connectionSchema.index({ createdAt: 1 });
 
 module.exports = mongoose.models.Connection || mongoose.model("Connection", connectionSchema);

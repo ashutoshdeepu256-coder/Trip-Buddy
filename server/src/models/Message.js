@@ -14,5 +14,6 @@ messageSchema.index({ conversation: 1, createdAt: -1, _id: -1 });
 messageSchema.index({ conversation: 1, sender: 1, createdAt: -1 });
 messageSchema.index({ sender: 1, idempotencyKey: 1 }, { unique: true });
 messageSchema.index({ conversation: 1, readBy: 1, sender: 1, createdAt: -1 });
+messageSchema.index({ createdAt: 1 });
 
 module.exports = mongoose.models.Message || mongoose.model("Message", messageSchema);

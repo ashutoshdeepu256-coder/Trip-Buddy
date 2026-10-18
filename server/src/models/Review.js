@@ -23,5 +23,7 @@ reviewSchema.index({ author: 1, reviewee: 1, trip: 1 }, { unique: true });
 reviewSchema.index({ reviewee: 1, status: 1, createdAt: -1, _id: -1 });
 reviewSchema.index({ trip: 1, status: 1, createdAt: -1, _id: -1 });
 reviewSchema.index({ author: 1, createdAt: -1 });
+reviewSchema.index({ createdAt: 1 });
+reviewSchema.index({ moderatedAt: 1 });
 
 module.exports = mongoose.models.Review || mongoose.model("Review", reviewSchema);

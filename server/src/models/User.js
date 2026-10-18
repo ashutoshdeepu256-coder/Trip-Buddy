@@ -127,5 +127,6 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.index({ name: 1, createdAt: -1 });
+userSchema.index({ createdAt: 1 });
 
 module.exports = mongoose.models.User || mongoose.model("User", userSchema);

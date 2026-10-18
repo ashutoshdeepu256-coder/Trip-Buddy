@@ -23,6 +23,7 @@ const settlementSchema = new mongoose.Schema({
 
 settlementSchema.index({ trip: 1, status: 1, recordedAt: -1 });
 settlementSchema.index({ trip: 1, currency: 1, status: 1 });
+settlementSchema.index({ recordedAt: 1 });
 settlementSchema.index({ trip: 1, recordedBy: 1, idempotencyKey: 1 }, { unique: true });
 settlementSchema.index({ paymentAttempt: 1 }, { unique: true, partialFilterExpression: { paymentAttempt: { $type: "objectId" } } });
 

@@ -45,6 +45,8 @@ paymentAttemptSchema.index({ provider: 1, providerPaymentId: 1 }, { unique: true
 paymentAttemptSchema.index({ provider: 1, providerRefundId: 1 }, { unique: true, partialFilterExpression: { providerRefundId: { $type: "string" } } });
 paymentAttemptSchema.index({ provider: 1, providerTransferId: 1 }, { unique: true, partialFilterExpression: { providerTransferId: { $type: "string" } } });
 paymentAttemptSchema.index({ trip: 1, createdAt: -1 });
+paymentAttemptSchema.index({ createdAt: 1 });
+paymentAttemptSchema.index({ "history.at": 1, "history.status": 1, "history.source": 1 });
 paymentAttemptSchema.index({ trip: 1, payer: 1, recipient: 1, currency: 1, status: 1 });
 
 module.exports = mongoose.models.PaymentAttempt || mongoose.model("PaymentAttempt", paymentAttemptSchema);

@@ -37,5 +37,6 @@ itinerarySchema.index({ trip: 1, owner: 1 });
 itinerarySchema.index({ owner: 1, createdAt: -1 });
 itinerarySchema.index({ trip: 1, collaborationEnabled: 1, updatedAt: -1 });
 itinerarySchema.index({ "collaborators.user": 1, collaborationEnabled: 1 });
+itinerarySchema.index({ source: 1, createdAt: 1 });
 
 module.exports = mongoose.models.Itinerary || mongoose.model("Itinerary", itinerarySchema);

@@ -88,5 +88,6 @@ const auditLogSchema = new mongoose.Schema(
 auditLogSchema.index({ actor: 1, createdAt: -1 });
 auditLogSchema.index({ resourceType: 1, resourceId: 1 });
 auditLogSchema.index({ action: 1, createdAt: -1 });
+auditLogSchema.index({ createdAt: 1 });
 
 module.exports = mongoose.models.AuditLog || mongoose.model("AuditLog", auditLogSchema);

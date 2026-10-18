@@ -91,6 +91,10 @@ const tripSchema = new mongoose.Schema(
 
 tripSchema.index({ creator: 1, createdAt: -1 });
 tripSchema.index({ title: 1, createdAt: -1 });
+tripSchema.index({ createdAt: 1 });
+tripSchema.index({ publishedAt: 1 });
+tripSchema.index({ completedAt: 1 });
+tripSchema.index({ cancelledAt: 1 });
 tripSchema.index({ destination: 1, status: 1, startDate: 1 });
 tripSchema.index({ status: 1, privacy: 1, startDate: 1 });
 tripSchema.index({ status: 1, startDate: 1, endDate: 1 });

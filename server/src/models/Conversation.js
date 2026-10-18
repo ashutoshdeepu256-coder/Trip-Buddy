@@ -26,5 +26,6 @@ conversationSchema.index(
 conversationSchema.index({ "participants.user": 1, status: 1, lastMessageAt: -1, updatedAt: -1 });
 conversationSchema.index({ trip: 1, status: 1 });
 conversationSchema.index({ connection: 1, type: 1, status: 1 });
+conversationSchema.index({ createdAt: 1 });
 
 module.exports = mongoose.models.Conversation || mongoose.model("Conversation", conversationSchema);

@@ -17,7 +17,7 @@ test.after(async () => {
 });
 
 test("admin APIs deny anonymous access before reading protected data", async () => {
-  for (const path of ["/api/v1/admin/overview", "/api/v1/admin/users", "/api/v1/admin/trips", "/api/v1/admin/audit"]) {
+  for (const path of ["/api/v1/admin/overview", "/api/v1/admin/users", "/api/v1/admin/trips", "/api/v1/admin/audit", "/api/v1/admin/analytics?window=7d"]) {
     const response = await fetch(`${origin}${path}`);
     const payload = await response.json();
     assert.equal(response.status, 401, path);

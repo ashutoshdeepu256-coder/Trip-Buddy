@@ -38,6 +38,7 @@ const expenseSchema = new mongoose.Schema({
 expenseSchema.index({ trip: 1, status: 1, expenseDate: -1, _id: -1 });
 expenseSchema.index({ trip: 1, currency: 1, status: 1 });
 expenseSchema.index({ creator: 1, createdAt: -1 });
+expenseSchema.index({ createdAt: 1 });
 expenseSchema.index({ trip: 1, creator: 1, idempotencyKey: 1 }, { unique: true });
 
 module.exports = mongoose.models.Expense || mongoose.model("Expense", expenseSchema);

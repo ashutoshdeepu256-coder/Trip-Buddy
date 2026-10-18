@@ -24,6 +24,7 @@ const paymentRoutes = require("./src/routes/payment.routes");
 const reviewRoutes = require("./src/routes/review.routes");
 const adminReviewRoutes = require("./src/routes/admin-review.routes");
 const adminRoutes = require("./src/routes/admin.routes");
+const adminAnalyticsRoutes = require("./src/routes/admin-analytics.routes");
 const notificationRoutes = require("./src/routes/notification.routes");
 const assistantRoutes = require("./src/routes/assistant.routes");
 
@@ -79,6 +80,7 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", profileRoutes);
 app.use("/api/v1/verifications", verificationRoutes);
 app.use("/api/v1/admin/verifications", adminVerificationRoutes);
+app.use("/api/v1/admin/analytics", adminAnalyticsRoutes);
 app.use("/api/v1/safety", safetyRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/assistant", assistantRoutes);

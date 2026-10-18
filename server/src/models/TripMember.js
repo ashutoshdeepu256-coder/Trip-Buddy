@@ -15,5 +15,6 @@ const tripMemberSchema = new mongoose.Schema(
 tripMemberSchema.index({ trip: 1, user: 1 }, { unique: true });
 tripMemberSchema.index({ trip: 1, status: 1 });
 tripMemberSchema.index({ user: 1, status: 1, createdAt: -1 });
+tripMemberSchema.index({ joinedAt: 1 });
 
 module.exports = mongoose.models.TripMember || mongoose.model("TripMember", tripMemberSchema);

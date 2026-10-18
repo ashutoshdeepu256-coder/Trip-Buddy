@@ -44,6 +44,7 @@ const reportSchema = new mongoose.Schema(
 
 reportSchema.index({ status:  1, createdAt: -1 });
 reportSchema.index({ status: 1, targetType: 1, createdAt: -1 });
+reportSchema.index({ createdAt: 1 });
 reportSchema.index({ reportedUser: 1, status: 1 });
 reportSchema.index({ reporter: 1, reportedUser: 1, status: 1 });
 reportSchema.index({ activeReportKey: 1 }, { unique: true, sparse: true });

@@ -30,6 +30,8 @@ const bookingSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 bookingSchema.index({ owner: 1, createdAt: -1 });
+bookingSchema.index({ createdAt: 1 });
+bookingSchema.index({ "statusHistory.changedAt": 1, "statusHistory.status": 1 });
 bookingSchema.index({ trip: 1, status: 1, startDate: 1 });
 bookingSchema.index({ status: 1, startDate: 1 });
 bookingSchema.index({ provider: 1, createdAt: -1 });

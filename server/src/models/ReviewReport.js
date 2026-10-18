@@ -13,5 +13,6 @@ const reviewReportSchema = new mongoose.Schema({
 
 reviewReportSchema.index({ reporter: 1, review: 1 }, { unique: true });
 reviewReportSchema.index({ status: 1, createdAt: 1 });
+reviewReportSchema.index({ createdAt: 1 });
 
 module.exports = mongoose.models.ReviewReport || mongoose.model("ReviewReport", reviewReportSchema);
