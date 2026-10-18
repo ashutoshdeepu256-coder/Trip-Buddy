@@ -9,6 +9,7 @@ const Block = require("../models/Block");
 const { HttpError } = require("../utils/http");
 const { recordAudit } = require("./audit.service");
 const { takeUserLimit } = require("./chat-rate-limit.service");
+const notificationService = require("./notification.service");
 
 const idOf = (value) => value?._id?.toString?.() || value?.toString?.() || "";
 const openTripStatuses = ["PUBLISHED", "PLANNING", "CONFIRMED", "ONGOING"];
@@ -237,14 +238,16 @@ const messageRecipients = async (conversation, senderId) => {
   return users.map((user) => user._id).filter((id) => !hidden.has(idOf(id)));
 };
 
-const createMessage = async (conversationId, actorId, { text, idempotencyKey }, req) => {
+const createMessage = async (conversationId, actorId, { text, idempotencyKey }, req, io = null) => {
   const { conversation, joinedAt } = await requireConversation(conversationId, actorId);
   const normalizedText = text.trim();
   if (!normalizedText || normalizedText.length > 4000) throw new HttpError(400, "Message must contain 1 to 4000 characters", "INVALID_MESSAGE");
   const existing = await Message.findOne({ sender: actorId, idempotencyKey }).lean();
   if (existing) {
     if (idOf(existing.conversation) !== idOf(conversation._id)) throw new HttpError(409, "Idempotency key was already used", "IDEMPOTENCY_CONFLICT");
-    return { message: serializeMessage(existing), recipients: await messageRecipients(conversation, actorId), duplicate: true };
+    const recipients = await messageRecipients(conversation, actorId);
+    await notificationService.notifyMessage({ conversationId: conversation._id, senderId: actorId, recipients, messageId: existing._id, io, req });
+    return { message: serializeMessage(existing), recipients, duplicate: true };
   }
   if (!takeUserLimit(actorId, "message", 20, 60_000)) {
     throw new HttpError(429, "Message rate limit reached", "RATE_LIMITED");
@@ -257,11 +260,15 @@ const createMessage = async (conversationId, actorId, { text, idempotencyKey }, 
     if (error.code !== 11000) throw error;
     message = await Message.findOne({ sender: actorId, idempotencyKey }).lean();
     if (!message || idOf(message.conversation) !== idOf(conversation._id)) throw new HttpError(409, "Idempotency key was already used", "IDEMPOTENCY_CONFLICT");
-    return { message: serializeMessage(message), recipients: await messageRecipients(conversation, actorId), duplicate: true };
+    const recipients = await messageRecipients(conversation, actorId);
+    await notificationService.notifyMessage({ conversationId: conversation._id, senderId: actorId, recipients, messageId: message._id, io, req });
+    return { message: serializeMessage(message), recipients, duplicate: true };
   }
   await Conversation.updateOne({ _id: conversation._id, status: "ACTIVE" }, { $set: { lastMessage: message._id, lastMessageAt: message.createdAt } });
   if (req) await recordAudit(req, { action: "CHAT_MESSAGE_SENT", resourceType: "Message", resourceId: message._id });
-  return { message: serializeMessage(message.toObject()), recipients: await messageRecipients(conversation, actorId), duplicate: false };
+  const recipients = await messageRecipients(conversation, actorId);
+  await notificationService.notifyMessage({ conversationId: conversation._id, senderId: actorId, recipients, messageId: message._id, io, req });
+  return { message: serializeMessage(message.toObject()), recipients, duplicate: false };
 };
 
 const markRead = async (conversationId, actorId, upToMessageId) => {

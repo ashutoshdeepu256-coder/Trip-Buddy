@@ -15,6 +15,7 @@ const webhook = async (req, res) => {
     rawBody: req.body,
     signature: req.get("x-razorpay-signature"),
     eventId: req.get("x-razorpay-event-id"),
+    io: req.app?.get?.("io"),
   });
   return sendSuccess(res, result, "Webhook accepted");
 };

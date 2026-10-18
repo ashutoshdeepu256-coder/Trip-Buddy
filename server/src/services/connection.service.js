@@ -4,6 +4,7 @@ const User = require("../models/User");
 const Trip = require("../models/Trip");
 const { isInteractionBlocked, getInteractionBlockedIds } = require("./safety.service");
 const { recordAudit } = require("./audit.service");
+const notificationService = require("./notification.service");
 const { HttpError } = require("../utils/http");
 
 const ACTIVE_TRIP_STATUSES = ["PUBLISHED", "PLANNING", "CONFIRMED"];
@@ -105,6 +106,7 @@ const sendRequest = async (actor, values, req) => {
     throw error;
   }
   await recordAudit(req, { action: "CONNECTION_REQUESTED", resourceType: "Connection", resourceId: connection._id });
+  await notificationService.notifyConnection({ connection, recipientId: recipient._id, actorId: actor._id, type: "CONNECTION_REQUEST", req });
   return serialize(await populateSafe(Connection.findById(connection._id)), actor._id);
 };
 
@@ -193,6 +195,9 @@ const transition = async (connectionId, actor, action, req) => {
   );
   if (!updated) throw new HttpError(409, "This connection was already updated", "INVALID_CONNECTION_STATE");
   await recordAudit(req, { action: fields.action, resourceType: "Connection", resourceId: updated._id });
+  if (action === "accept" || action === "reject") {
+    await notificationService.notifyConnection({ connection: updated, recipientId: connection.requester, actorId: actor._id, type: action === "accept" ? "CONNECTION_ACCEPTED" : "CONNECTION_REJECTED", req });
+  }
   return serialize(await populateSafe(Connection.findById(updated._id)).lean(), actor._id);
 };
 

@@ -8,6 +8,7 @@ const Review = require("../models/Review");
 const chatService = require("./chat.service");
 const { HttpError } = require("../utils/http");
 const { recordAudit } = require("./audit.service");
+const notificationService = require("./notification.service");
 
 const blockUser = async (actor, targetId, req) => {
   if (!mongoose.isValidObjectId(targetId)) {
@@ -245,6 +246,7 @@ const reviewReport = async ({ reportId, moderator, status, resolution, req }) =>
     resourceId: report._id,
     metadata: { previousStatus, status },
   });
+  await notificationService.notifySafetyStatus({ report, status, req });
   return { id: report._id.toString(), status: report.status, resolvedAt: report.resolvedAt };
 };
 

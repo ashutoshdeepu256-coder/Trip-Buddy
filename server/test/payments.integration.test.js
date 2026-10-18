@@ -22,11 +22,12 @@ test("Razorpay Route payment, callback, duplicate/out-of-order webhook, refund a
   const ExpenseSettlement = require("../src/models/ExpenseSettlement");
   const PaymentAttempt = require("../src/models/PaymentAttempt");
   const PaymentWebhookEvent = require("../src/models/PaymentWebhookEvent");
+  const Notification = require("../src/models/Notification");
   const AuditLog = require("../src/models/AuditLog");
   const paymentService = require("../src/services/payment.service");
   const paymentProvider = require("../src/services/paymentProvider.service");
   const expenseService = require("../src/services/expense.service");
-  await Promise.all([User, Trip, TripMember, Expense, ExpenseSettlement, PaymentAttempt, PaymentWebhookEvent, AuditLog].map((model) => model.init()));
+  await Promise.all([User, Trip, TripMember, Expense, ExpenseSettlement, PaymentAttempt, PaymentWebhookEvent, Notification, AuditLog].map((model) => model.init()));
 
   const owner = await User.create({ name: "Creditor", email: "phase19-owner@test.invalid", passwordHash: "integration-placeholder", razorpayLinkedAccountId: "acc_tripbuddy_owner_19" });
   const payer = await User.create({ name: "Payer", email: "phase19-payer@test.invalid", passwordHash: "integration-placeholder" });
@@ -141,6 +142,7 @@ test("Razorpay Route payment, callback, duplicate/out-of-order webhook, refund a
     assert.equal(accepted.matched, true);
     const duplicate = await paymentService.processWebhook(event);
     assert.equal(duplicate.duplicate, true);
+    assert.equal(await Notification.countDocuments({ relatedEntityType: "PaymentAttempt", relatedEntityId: attempt._id, type: "PAYMENT_SUCCEEDED" }), 2);
     const saved = await PaymentAttempt.findById(attempt._id);
     assert.equal(saved.status, "SUCCEEDED");
     assert.equal(await ExpenseSettlement.countDocuments({ paymentAttempt: attempt._id, source: "PROVIDER_VERIFIED", status: "RECORDED" }), 1);

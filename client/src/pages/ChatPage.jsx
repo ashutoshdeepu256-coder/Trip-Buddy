@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft, MessageCircle, Send } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { useChatStore } from '../store/chatStore'
-import chatService, { disconnectChatSocket, getChatSocket } from '../services/chatService'
+import chatService, { getChatSocket } from '../services/chatService'
 import './ChatPage.css'
 
 const apiError = (error) => error.response?.data?.error?.message || error.message || 'Chat is temporarily unavailable.'
@@ -118,7 +118,6 @@ export default function ChatPage() {
       socket.off('chat:typing', onTyping)
       if (typingTimer.current) clearTimeout(typingTimer.current)
       socketRef.current = null
-      disconnectChatSocket()
     }
   }, [loadConversations, setConversations, user?.id])
 

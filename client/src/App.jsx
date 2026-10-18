@@ -22,6 +22,9 @@ import BookingsPage from './pages/BookingsPage'
 import TripExpenses from './pages/trips/TripExpenses'
 import PaymentsPage from './pages/PaymentsPage'
 import SafetyCenter from './pages/SafetyCenter'
+import NotificationsPage from './pages/NotificationsPage'
+import NotificationBell from './components/notifications/NotificationBell'
+import { useNotificationStore } from './store/notificationStore'
 
 const facts = [
   { label: 'Travel style', value: 'Your pace' },
@@ -60,6 +63,14 @@ function App() {
   useEffect(() => {
     fetchMe()
   }, [fetchMe])
+
+  const startNotifications = useNotificationStore((state) => state.start)
+  const stopNotifications = useNotificationStore((state) => state.stop)
+  useEffect(() => {
+    if (user?.id) startNotifications(user.id)
+    else stopNotifications()
+    return () => stopNotifications()
+  }, [user?.id, startNotifications, stopNotifications])
 
   const home = (
     <div className="app-shell">
@@ -194,6 +205,8 @@ function App() {
   if (loading) return <div className="page-loading" role="status">Loading TripBuddy…</div>
 
   return (
+    <>
+    {user && <NotificationBell />}
     <Routes>
       <Route path="/" element={home} />
       <Route path="/login" element={<AuthPage mode="login" />} />
@@ -209,6 +222,7 @@ function App() {
       <Route path="/trips/:tripId/expenses" element={<ProtectedRoute><TripExpenses /></ProtectedRoute>} />
       <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
       <Route path="/safety" element={<ProtectedRoute><SafetyCenter /></ProtectedRoute>} />
+      <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       <Route path="/profile/edit" element={<ProtectedRoute><ProfilePage edit /></ProtectedRoute>} />
       <Route path="/profile/travel-preferences" element={<ProtectedRoute><ProfilePage edit travelPreferences /></ProtectedRoute>} />
@@ -223,6 +237,7 @@ function App() {
       <Route path="/bookings" element={<ProtectedRoute><BookingsPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   )
 }
 

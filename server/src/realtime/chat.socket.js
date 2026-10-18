@@ -145,7 +145,7 @@ const createChatSocket = (httpServer, app) => {
         ip: socket.handshake.address,
         get: (name) => socket.handshake.headers[name.toLowerCase()],
       };
-      const result = await chatService.createMessage(data.conversationId, actor._id, data, auditRequest);
+      const result = await chatService.createMessage(data.conversationId, actor._id, data, auditRequest, socket.nsp.server);
       await broadcastMessage(io, result.message, result.recipients);
       return { message: result.message, duplicate: result.duplicate };
     }));

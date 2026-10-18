@@ -9,6 +9,7 @@ const { HttpError } = require("../utils/http");
 const { calculateAllocations } = require("./expenseSplit.service");
 const { buildLedger, suggestSettlements } = require("./expenseLedger.service");
 const paymentProvider = require("./paymentProvider.service");
+const notificationService = require("./notification.service");
 
 const idOf = (value) => value?._id?.toString?.() || value?.toString?.() || "";
 const eligibleTripStatuses = ["PUBLISHED", "PLANNING", "CONFIRMED", "ONGOING", "COMPLETED"];
@@ -161,7 +162,7 @@ const idempotencyKey = (req) => {
 const create = async (req, tripId, data) => {
   const key = idempotencyKey(req);
   try {
-    return await withLedgerWrite(req, tripId, async (session) => {
+    const result = await withLedgerWrite(req, tripId, async (session) => {
       const previous = await Expense.findOne({ trip: tripId, creator: req.user._id, idempotencyKey: key }).session(session);
       if (previous) return { changed: false, result: { expense: serializeExpense(previous, req.user._id), duplicate: true } };
       const currentMembers = await activeParticipants(tripId, session);
@@ -173,6 +174,8 @@ const create = async (req, tripId, data) => {
       await audit(req, session, { action: "EXPENSE_CREATED", resourceType: "EXPENSE", resourceId: expense._id, tripId });
       return { changed: true, result: { expense: serializeExpense(expense, req.user._id), duplicate: false } };
     });
+    await notificationService.notifyExpense({ expense: result.expense, recipients: result.expense.allocations.map((item) => item.userId), actorId: req.user._id, req });
+    return result;
   } catch (error) {
     if (error.code === 11000) {
       await assertTripAccess(tripId, req.user);
@@ -183,7 +186,8 @@ const create = async (req, tripId, data) => {
   }
 };
 
-const update = async (req, tripId, expenseId, data) => withLedgerWrite(req, tripId, async (session) => {
+const update = async (req, tripId, expenseId, data) => {
+  const result = await withLedgerWrite(req, tripId, async (session) => {
   const current = await Expense.findOne({ _id: expenseId, trip: tripId }).session(session);
   if (!current) throw new HttpError(404, "Expense was not found", "EXPENSE_NOT_FOUND");
   if (idOf(current.creator) !== idOf(req.user._id)) throw new HttpError(403, "Only the expense creator can edit this expense", "EXPENSE_EDIT_FORBIDDEN");
@@ -205,9 +209,13 @@ const update = async (req, tripId, expenseId, data) => withLedgerWrite(req, trip
   if (!expense) throw new HttpError(409, "Expense changed; reload before editing", "EXPENSE_REVISION_CONFLICT");
   await audit(req, session, { action: "EXPENSE_UPDATED", resourceType: "EXPENSE", resourceId: expense._id, tripId });
   return { changed: true, result: serializeExpense(expense, req.user._id) };
-});
+  });
+  await notificationService.notifyExpense({ expense: result, recipients: result.allocations.map((item) => item.userId), type: "EXPENSE_UPDATED", actorId: req.user._id, req });
+  return result;
+};
 
-const voidExpense = async (req, tripId, expenseId, { expectedRevision, reason }) => withLedgerWrite(req, tripId, async (session, { trip }) => {
+const voidExpense = async (req, tripId, expenseId, { expectedRevision, reason }) => {
+  const result = await withLedgerWrite(req, tripId, async (session, { trip }) => {
   const expense = await Expense.findOne({ _id: expenseId, trip: tripId }).session(session);
   if (!expense) throw new HttpError(404, "Expense was not found", "EXPENSE_NOT_FOUND");
   const actorIsCreator = idOf(expense.creator) === idOf(req.user._id);
@@ -224,7 +232,10 @@ const voidExpense = async (req, tripId, expenseId, { expectedRevision, reason })
   await expense.save({ session });
   await audit(req, session, { action: "EXPENSE_VOIDED", resourceType: "EXPENSE", resourceId: expense._id, tripId });
   return { changed: true, result: serializeExpense(expense, req.user._id) };
-});
+  });
+  await notificationService.notifyExpense({ expense: result, recipients: result.allocations.map((item) => item.userId), type: "EXPENSE_VOIDED", actorId: req.user._id, req });
+  return result;
+};
 
 const summary = async (actor, tripId) => withLedgerRead(actor, tripId, async (session) => {
   const [ledger, trip] = await Promise.all([loadLedger(tripId, session), Trip.findById(tripId).select("title creator expenseRevision").session(session).lean()]);
@@ -235,8 +246,9 @@ const settlementSuggestions = async (actor, tripId) => withLedgerRead(actor, tri
 
 const recordSettlement = async (req, tripId, data) => {
   const key = idempotencyKey(req);
+  let result;
   try {
-    return await withLedgerWrite(req, tripId, async (session) => {
+    result = await withLedgerWrite(req, tripId, async (session) => {
       const previous = await ExpenseSettlement.findOne({ trip: tripId, recordedBy: req.user._id, idempotencyKey: key }).session(session);
       if (previous) return { changed: false, result: { settlement: serializeSettlement(previous), duplicate: true } };
       if (idOf(req.user._id) === data.toUserId) throw new HttpError(400, "A settlement must have a different recipient", "INVALID_SETTLEMENT_RECIPIENT");
@@ -259,10 +271,12 @@ const recordSettlement = async (req, tripId, data) => {
     if (error.code === 11000) {
       await assertTripAccess(tripId, req.user);
       const previous = await ExpenseSettlement.findOne({ trip: tripId, recordedBy: req.user._id, idempotencyKey: key });
-      if (previous) return { settlement: serializeSettlement(previous), duplicate: true };
-    }
-    throw error;
+      if (previous) result = { settlement: serializeSettlement(previous), duplicate: true };
+      else throw error;
+    } else throw error;
   }
+  await notificationService.notifySettlement({ settlement: result.settlement, req });
+  return result;
 };
 
 const listSettlements = async (actor, tripId, { page, limit }) => {

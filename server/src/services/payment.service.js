@@ -12,6 +12,7 @@ const { HttpError } = require("../utils/http");
 const { buildLedger } = require("./expenseLedger.service");
 const expenseService = require("./expense.service");
 const paymentProvider = require("./paymentProvider.service");
+const notificationService = require("./notification.service");
 
 const activeTripStatuses = ["PUBLISHED", "PLANNING", "CONFIRMED", "ONGOING", "COMPLETED"];
 const reservedStatuses = ["CREATED", "PENDING", "AUTHORIZED", "TRANSFER_PENDING", "REFUND_PENDING"];
@@ -200,7 +201,7 @@ const findMatchingTransfer = (attempt, providerOrder) => {
   return transfers.find((transfer) => transfer.recipient === attempt.providerRecipientAccountId && transfer.amount === attempt.amountMinorUnits && transfer.currency === attempt.currency);
 };
 
-const completeCapturedPayment = async ({ attempt, providerPayment, provider, providerOrder = null, source, actor = null, eventId = null, sharedSession = null }) => {
+const completeCapturedPayment = async ({ attempt, providerPayment, provider, providerOrder = null, source, actor = null, eventId = null, sharedSession = null, io = null }) => {
   assertProviderPaymentMatches(attempt, providerPayment);
   if (providerPayment.status !== "captured" || providerPayment.captured !== true) return { matched: true, payment: serializeAttempt(attempt), verified: false };
   const orderWithTransfers = providerOrder || await provider.orders.fetchTransferOrder(attempt.providerOrderId);
@@ -222,16 +223,17 @@ const completeCapturedPayment = async ({ attempt, providerPayment, provider, pro
     else { try { await session.withTransaction(() => markPending(session)); } finally { await session.endSession(); } }
     return { matched: true, payment: serializeAttempt(current || attempt), verified: false };
   }
-  const result = await applyCapturedPayment({ providerPayment, providerTransfer: transfer, source, actor, eventId, sharedSession });
+  const result = await applyCapturedPayment({ providerPayment, providerTransfer: transfer, source, actor, eventId, sharedSession, io });
   return { ...result, verified: result.payment.status === "SUCCEEDED" };
 };
 
-const applyCapturedPayment = async ({ providerPayment, providerTransfer, source, actor = null, eventId = null, sharedSession = null }) => {
+const applyCapturedPayment = async ({ providerPayment, providerTransfer, source, actor = null, eventId = null, sharedSession = null, io = null }) => {
   const attemptBefore = await PaymentAttempt.findOne({ providerOrderId: providerPayment.order_id });
   if (!attemptBefore) return { matched: false };
   assertProviderPaymentMatches(attemptBefore, providerPayment);
   if (providerPayment.status !== "captured" || providerPayment.captured !== true) return { matched: true, payment: serializeAttempt(attemptBefore) };
   let attempt;
+  const notificationKeys = [];
   const apply = async (session) => {
       attempt = await PaymentAttempt.findById(attemptBefore._id).session(session);
       if (!attempt) throw new HttpError(404, "Payment attempt was not found", "PAYMENT_NOT_FOUND");
@@ -260,14 +262,25 @@ const applyCapturedPayment = async ({ providerPayment, providerTransfer, source,
       await attempt.save({ session });
       await markTripChanged(attempt.trip, session);
       await addAudit({ actor, action: "PAYMENT_SUCCEEDED", attempt, session, eventId });
+      for (const recipientId of [attempt.payer, attempt.recipient]) {
+        const key = `payment:${idOf(attempt._id)}:SUCCEEDED:${idOf(recipientId)}`;
+        notificationKeys.push(key);
+        await notificationService.persist({
+          recipient: recipientId, actorId: attempt.payer, type: "PAYMENT_SUCCEEDED", category: "PAYMENTS",
+          title: "Trip payment update", body: "A trip payment was verified. View payment details for more information.",
+          metadata: { route: "/payments" }, relatedEntityType: "PaymentAttempt", relatedEntityId: attempt._id,
+          deduplicationKey: key,
+        }, { session });
+      }
   };
   if (sharedSession) await apply(sharedSession);
   else {
     const session = await mongoose.startSession();
     try { await session.withTransaction(() => apply(session)); }
     finally { await session.endSession(); }
+    await notificationService.dispatchByDeduplicationKeys(notificationKeys, io);
   }
-  return { matched: true, payment: serializeAttempt(attempt || attemptBefore) };
+  return { matched: true, payment: serializeAttempt(attempt || attemptBefore), notificationKeys };
 };
 
 const verifyCheckout = async (req, data) => {
@@ -281,7 +294,7 @@ const verifyCheckout = async (req, data) => {
   ensureRouteReady();
   const providerPayment = await paymentProvider.getProvider().payments.fetch(data.razorpay_payment_id);
   assertProviderPaymentMatches(attempt, providerPayment);
-  const result = await completeCapturedPayment({ attempt, providerPayment, provider: paymentProvider.getProvider(), source: "CHECKOUT", actor: req.user._id });
+  const result = await completeCapturedPayment({ attempt, providerPayment, provider: paymentProvider.getProvider(), source: "CHECKOUT", actor: req.user._id, io: req.app?.get?.("io") });
   return { payment: result.payment, verified: result.verified };
 };
 
@@ -334,7 +347,7 @@ const verifyWebhookSignature = (rawBody, signature, secret) => {
   return compareSignature(expected, signature);
 };
 
-const processWebhook = async ({ rawBody, signature, eventId, provider }) => {
+const processWebhook = async ({ rawBody, signature, eventId, provider, io = null }) => {
   const config = paymentProvider.configuration();
   if (!config.webhookSecret) throw new HttpError(503, "Razorpay webhook secret is not configured", "PAYMENT_WEBHOOK_UNAVAILABLE");
   if (!verifyWebhookSignature(rawBody, signature, config.webhookSecret)) throw new HttpError(400, "Webhook signature is invalid", "PAYMENT_WEBHOOK_SIGNATURE_INVALID");
@@ -384,12 +397,14 @@ const processWebhook = async ({ rawBody, signature, eventId, provider }) => {
   }
   const session = await mongoose.startSession();
   let duplicate = false;
+  let notificationKeys = [];
   try {
     await session.withTransaction(async () => {
       if (await PaymentWebhookEvent.exists({ provider: "RAZORPAY", eventId }).session(session)) { duplicate = true; return; }
       let currentAttempt = match ? await PaymentAttempt.findById(match._id).session(session) : null;
       if (currentAttempt && providerPayment?.status === "captured" && providerPayment.captured === true && eventType !== "transfer.reversed") {
-        const result = await completeCapturedPayment({ attempt: currentAttempt, providerPayment, provider: api, providerOrder, source: "WEBHOOK", eventId, sharedSession: session });
+        const result = await completeCapturedPayment({ attempt: currentAttempt, providerPayment, provider: api, providerOrder, source: "WEBHOOK", eventId, sharedSession: session, io });
+        notificationKeys = result.notificationKeys || [];
         currentAttempt = result.matched ? currentAttempt : null;
       } else if (currentAttempt && eventType === "transfer.reversed") {
         const transfer = findMatchingTransfer(currentAttempt, providerOrder);
@@ -425,6 +440,7 @@ const processWebhook = async ({ rawBody, signature, eventId, provider }) => {
     throw error;
   } finally { await session.endSession(); }
   if (duplicate) return { duplicate: true };
+  await notificationService.dispatchByDeduplicationKeys(notificationKeys, io);
   return { duplicate: false, matched: Boolean(match) };
 };
 
@@ -471,7 +487,7 @@ const reconcile = async (req) => {
     if (refund && transfer) return { payment: await transitionRefunded({ attemptId: attempt._id, providerRefund: refund, providerPayment, providerTransfer: transfer, source: "RECONCILIATION" }), reconciled: true };
   }
   if (captured) {
-    const result = await completeCapturedPayment({ attempt, providerPayment, provider, providerOrder: orderWithTransfers, source: "RECONCILIATION", actor: req.user._id });
+    const result = await completeCapturedPayment({ attempt, providerPayment, provider, providerOrder: orderWithTransfers, source: "RECONCILIATION", actor: req.user._id, io: req.app?.get?.("io") });
     return { payment: result.payment, reconciled: result.verified };
   }
   await PaymentAttempt.updateOne({ _id: attempt._id, status: { $in: ["PENDING", "AUTHORIZED", "TRANSFER_PENDING"] } }, { $set: { providerStatus: order.status || "created" } });
