@@ -71,6 +71,8 @@ const auditLogSchema = new mongoose.Schema(
         "REVIEW_MODERATED",
         "REVIEW_REPORT_RESOLVED",
         "ADMIN_ACTION",
+        "ADMIN_USER_STATUS_CHANGED",
+        "ADMIN_ROLE_CHANGED",
       ],
       required: true,
     },

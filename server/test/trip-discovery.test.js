@@ -49,6 +49,7 @@ test("discovery pipeline limits publication and privacy before calculating open 
   const anonymous = tripDiscovery.buildDiscoveryPipeline(parse());
   assert.deepEqual(anonymous[0].$match, {
     status: { $in: ["PUBLISHED", "PLANNING", "CONFIRMED"] },
+    moderationVisibility: { $ne: "HIDDEN" },
     privacy: "PUBLIC",
   });
   assert.ok(anonymous.some((stage) => stage.$match?.availableSlots?.$gt === 0));
@@ -117,7 +118,7 @@ test("nearby trip discovery uses GeoJSON longitude-latitude and filters eligibil
   assert.deepEqual(pipeline[0].$geoNear.near, { type: "Point", coordinates: [-73.9, 40.7] });
   assert.equal(pipeline[0].$geoNear.maxDistance, 25000);
   assert.equal(pipeline[0].$geoNear.key, "location");
-  assert.deepEqual(pipeline[0].$geoNear.query, { status: { $in: ["PUBLISHED", "PLANNING", "CONFIRMED"] }, privacy: "PUBLIC" });
+  assert.deepEqual(pipeline[0].$geoNear.query, { status: { $in: ["PUBLISHED", "PLANNING", "CONFIRMED"] }, moderationVisibility: { $ne: "HIDDEN" }, privacy: "PUBLIC" });
   assert.ok(pipeline.some((stage) => stage.$lookup?.as === "destinationDoc"));
 });
 

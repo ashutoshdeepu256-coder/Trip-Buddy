@@ -22,6 +22,9 @@ const listReports = async (req, res) =>
       status: req.validatedQuery.status,
       page: req.validatedQuery.page,
       limit: req.validatedQuery.limit,
+      targetType: req.validatedQuery.targetType,
+      createdFrom: req.validatedQuery.createdFrom,
+      createdTo: req.validatedQuery.createdTo,
     }),
   );
 

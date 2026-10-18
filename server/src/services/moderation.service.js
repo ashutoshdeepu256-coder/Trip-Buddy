@@ -74,8 +74,11 @@ const record = async ({ targetType, targetId, actor = null, result, reviewStatus
   return ModerationRecord.findOneAndUpdate({ targetType, targetId }, update, { upsert: true, new: true, setDefaultsOnInsert: true, ...(session ? { session } : {}) });
 };
 
-const listQueue = async ({ page, limit, status = "OPEN" }) => {
+const listQueue = async ({ page, limit, status = "OPEN", targetType, severity, createdFrom, createdTo }) => {
   const query = status === "ALL" ? { reviewStatus: { $in: ["OPEN", "IN_REVIEW", "ESCALATED"] } } : { reviewStatus: status };
+  if (targetType) query.targetType = targetType;
+  if (severity) query.severity = severity;
+  if (createdFrom || createdTo) query.createdAt = { ...(createdFrom ? { $gte: createdFrom } : {}), ...(createdTo ? { $lte: createdTo } : {}) };
   const [items, total] = await Promise.all([
     ModerationRecord.find(query).select("+moderatorReason +appealReason").sort({ severity: -1, updatedAt: 1 }).skip((page - 1) * limit).limit(limit).lean(),
     ModerationRecord.countDocuments(query),
@@ -111,7 +114,7 @@ const listQueue = async ({ page, limit, status = "OPEN" }) => {
 const decide = async ({ recordId, moderator, action, reason, req }) => {
   const initial = await ModerationRecord.findById(recordId).select("targetType").lean();
   if (!initial) throw new HttpError(404, "Moderation item was not found", "MODERATION_NOT_FOUND");
-  if (["HIDE", "RESTORE"].includes(action) && !["MESSAGE", "REVIEW"].includes(initial.targetType)) throw new HttpError(400, "Hide and restore are not supported for this content type", "MODERATION_ACTION_UNSUPPORTED");
+  if (["HIDE", "RESTORE"].includes(action) && !["MESSAGE", "REVIEW", "TRIP"].includes(initial.targetType)) throw new HttpError(400, "Hide and restore are not supported for this content type", "MODERATION_ACTION_UNSUPPORTED");
   const row = await ModerationRecord.findOneAndUpdate(
     { _id: recordId, reviewStatus: { $in: ["OPEN", "IN_REVIEW", "ESCALATED"] } },
     { $set: { reviewStatus: action === "ESCALATE" ? "ESCALATED" : action === "FLAG" ? "DISMISSED" : action === "HIDE" ? "ACTIONED" : "APPROVED", finalAction: action, moderator: moderator._id, moderatorReason: normalize(reason).slice(0, 500), reviewedAt: new Date() } },
@@ -130,6 +133,10 @@ const decide = async ({ recordId, moderator, action, reason, req }) => {
   if (row.targetType === "REVIEW" && ["HIDE", "RESTORE"].includes(action)) {
     const reviewService = require("./review.service");
     await reviewService.moderate(req, row.targetId.toString(), { status: action === "HIDE" ? "HIDDEN" : "PUBLISHED", reason });
+  }
+  if (row.targetType === "TRIP" && ["HIDE", "RESTORE"].includes(action)) {
+    const Trip = require("../models/Trip");
+    await Trip.updateOne({ _id: row.targetId }, { $set: { moderationVisibility: action === "HIDE" ? "HIDDEN" : "VISIBLE" } });
   }
   const { recordAudit } = require("./audit.service");
   await recordAudit(req, { action: "MODERATION_DECISION", resourceType: "ModerationRecord", resourceId: row._id, metadata: { targetType: row.targetType, action, reason: normalize(reason).slice(0, 500) } });

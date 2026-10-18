@@ -71,6 +71,7 @@ const tripSchema = new mongoose.Schema(
       default: "DRAFT",
       index: true,
     },
+    moderationVisibility: { type: String, enum: ["VISIBLE", "HIDDEN"], default: "VISIBLE", index: true },
     images: { type: [tripImageSchema], default: [] },
     location: { type: tripLocationSchema, default: undefined },
     publishedAt: { type: Date, default: null },
@@ -89,11 +90,13 @@ const tripSchema = new mongoose.Schema(
 );
 
 tripSchema.index({ creator: 1, createdAt: -1 });
+tripSchema.index({ title: 1, createdAt: -1 });
 tripSchema.index({ destination: 1, status: 1, startDate: 1 });
 tripSchema.index({ status: 1, privacy: 1, startDate: 1 });
 tripSchema.index({ status: 1, startDate: 1, endDate: 1 });
 tripSchema.index({ status: 1, "budget.min": 1, "budget.max": 1 });
 tripSchema.index({ status: 1, privacy: 1, startDate: 1, "budget.currency": 1 });
+tripSchema.index({ status: 1, moderationVisibility: 1, privacy: 1, createdAt: -1 });
 tripSchema.index({ location: "2dsphere" });
 
 module.exports = mongoose.models.Trip || mongoose.model("Trip", tripSchema);

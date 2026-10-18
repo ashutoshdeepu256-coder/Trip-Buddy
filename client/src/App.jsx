@@ -24,6 +24,7 @@ import PaymentsPage from './pages/PaymentsPage'
 import SafetyCenter from './pages/SafetyCenter'
 import NotificationsPage from './pages/NotificationsPage'
 import TravelAssistant from './pages/TravelAssistant'
+import AdminPanel from './pages/AdminPanel'
 import NotificationBell from './components/notifications/NotificationBell'
 import { useNotificationStore } from './store/notificationStore'
 
@@ -98,6 +99,7 @@ function App() {
             <Link to="/assistant">AI assistant</Link>
             <Link to="/bookings">Travel services</Link>
             <Link to="/safety">Safety Center</Link>
+            {['ADMIN', 'MODERATOR'].includes(user.role) && <Link to="/admin">Admin panel</Link>}
             <Link to="/profile" className="text-link">My profile</Link>
             <button type="button" className="secondary-btn nav-action" onClick={logout}>
               Sign out
@@ -224,6 +226,7 @@ function App() {
       <Route path="/trips/:tripId/expenses" element={<ProtectedRoute><TripExpenses /></ProtectedRoute>} />
       <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
       <Route path="/safety" element={<ProtectedRoute><SafetyCenter /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
       <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       <Route path="/profile/edit" element={<ProtectedRoute><ProfilePage edit /></ProtectedRoute>} />

@@ -39,6 +39,9 @@ const login = async ({ email, password }) => {
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     throw new HttpError(401, "Email or password is incorrect", "INVALID_CREDENTIALS");
   }
+  if (user.accountStatus && user.accountStatus !== "ACTIVE") {
+    throw new HttpError(403, "This account is restricted", "ACCOUNT_RESTRICTED");
+  }
   return user;
 };
 
@@ -67,4 +70,6 @@ const publicUser = (user) => ({
   createdAt: user.createdAt,
 });
 
-module.exports = { register, login, createSessionToken, publicUser };
+const sessionUser = (user) => ({ ...publicUser(user), role: user.role || "USER", accountStatus: user.accountStatus || "ACTIVE" });
+
+module.exports = { register, login, createSessionToken, publicUser, sessionUser };

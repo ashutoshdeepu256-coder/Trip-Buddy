@@ -80,6 +80,7 @@ const lookupStages = [
 const buildDiscoveryPipeline = (filters, user = null, destinationIds = null) => {
   const match = {
     status: { $in: ["PUBLISHED", "PLANNING", "CONFIRMED"] },
+    moderationVisibility: { $ne: "HIDDEN" },
     privacy: user ? { $in: ["PUBLIC", "COMMUNITY"] } : "PUBLIC",
   };
   if (destinationIds) match.destination = { $in: destinationIds };

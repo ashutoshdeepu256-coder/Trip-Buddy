@@ -14,8 +14,24 @@ function SafetyCenter() {
   const [contacts, setContacts] = useState([])
   const [reports, setReports] = useState([])
   const [moderatorReports, setModeratorReports] = useState([])
+  const [reviewReports, setReviewReports] = useState([])
+  const [reviewReportPage, setReviewReportPage] = useState(1)
+  const [reviewReportTotalPages, setReviewReportTotalPages] = useState(1)
+  const [reviewReportStatus, setReviewReportStatus] = useState('OPEN')
+  const [reportPage, setReportPage] = useState(1)
+  const [reportTotalPages, setReportTotalPages] = useState(1)
+  const [reportStatus, setReportStatus] = useState('')
+  const [reportType, setReportType] = useState('')
+  const [reportFrom, setReportFrom] = useState('')
+  const [reportTo, setReportTo] = useState('')
   const [moderationItems, setModerationItems] = useState([])
   const [moderationFilter, setModerationFilter] = useState('OPEN')
+  const [moderationPage, setModerationPage] = useState(1)
+  const [moderationTotalPages, setModerationTotalPages] = useState(1)
+  const [moderationType, setModerationType] = useState('')
+  const [moderationSeverity, setModerationSeverity] = useState('')
+  const [moderationFrom, setModerationFrom] = useState('')
+  const [moderationTo, setModerationTo] = useState('')
   const [moderatorAccess, setModeratorAccess] = useState(false)
   const [contact, setContact] = useState(emptyContact)
   const [editingContact, setEditingContact] = useState(null)
@@ -35,15 +51,20 @@ function SafetyCenter() {
     setContacts(nextContacts)
     setReports(nextReports.items || [])
     try {
-      const queue = await safetyService.moderatorReports()
+      const queue = await safetyService.moderatorReports({ page: reportPage, limit: 20, status: reportStatus || undefined, targetType: reportType || undefined, createdFrom: reportFrom ? new Date(reportFrom).toISOString() : undefined, createdTo: reportTo ? new Date(reportTo).toISOString() : undefined })
       setModeratorReports(queue.items || queue)
-      const moderationQueue = await safetyService.moderationQueue(moderationFilter)
+      setReportTotalPages(queue.totalPages || 1)
+      const reviews = await safetyService.reviewReports({ page: reviewReportPage, limit: 20, status: reviewReportStatus })
+      setReviewReports(reviews.items || [])
+      setReviewReportTotalPages(reviews.totalPages || 1)
+      const moderationQueue = await safetyService.moderationQueue({ status: moderationFilter, page: moderationPage, limit: 20, targetType: moderationType || undefined, severity: moderationSeverity || undefined, createdFrom: moderationFrom ? new Date(moderationFrom).toISOString() : undefined, createdTo: moderationTo ? new Date(moderationTo).toISOString() : undefined })
       setModerationItems(moderationQueue.items || [])
+      setModerationTotalPages(moderationQueue.totalPages || 1)
       setModeratorAccess(true)
     } catch (requestError) {
       if (requestError.response?.status !== 403) setModeratorAccess(false)
     }
-  }, [moderationFilter])
+  }, [moderationFilter, moderationPage, moderationType, moderationSeverity, moderationFrom, moderationTo, reportPage, reportStatus, reportType, reportFrom, reportTo, reviewReportPage, reviewReportStatus])
 
   useEffect(() => {
     let active = true
@@ -81,6 +102,18 @@ function SafetyCenter() {
   const moderate = (id, status) => perform(async () => {
     await safetyService.resolveReport(id, { status, moderatorNotes: moderatorNotes[id] || '' })
   }, 'Report status updated.')
+
+  const resolveReviewReport = (item, status) => {
+    const resolution = moderatorNotes[item.id]?.trim()
+    if (!resolution) { setError('Add a resolution note before closing this review report.'); return }
+    perform(() => safetyService.resolveReviewReport(item.id, { status, resolution }), 'Review report updated.')
+  }
+
+  const moderateReview = (item, status) => {
+    const reason = moderatorNotes[item.id]?.trim()
+    if (!reason) { setError('Add a reason before changing review visibility.'); return }
+    perform(() => safetyService.moderateReview(item.id, { status, reason }), 'Review visibility updated.')
+  }
 
   const decideModeration = (item, action) => {
     const reason = moderatorNotes[item.id]?.trim()
@@ -161,14 +194,36 @@ function SafetyCenter() {
 
         {moderatorAccess && <section className="safety-section">
           <h2>Moderator report queue</h2>
+          <div className="safety-form">
+            <label>Status<select value={reportStatus} onChange={(event) => { setReportPage(1); setReportStatus(event.target.value) }}><option value="">All reports</option>{['SUBMITTED', 'OPEN', 'UNDER_REVIEW', 'RESOLVED', 'DISMISSED'].map((status) => <option key={status}>{status}</option>)}</select></label>
+            <label>Target type<select value={reportType} onChange={(event) => { setReportPage(1); setReportType(event.target.value) }}><option value="">All types</option>{['TRAVELLER', 'TRIP', 'MESSAGE', 'REVIEW', 'INCIDENT'].map((type) => <option key={type}>{type}</option>)}</select></label>
+            <label>Created from<input type="datetime-local" value={reportFrom} onChange={(event) => { setReportPage(1); setReportFrom(event.target.value) }} /></label>
+            <label>Created to<input type="datetime-local" value={reportTo} onChange={(event) => { setReportPage(1); setReportTo(event.target.value) }} /></label>
+          </div>
           {!moderatorReports.length ? <p className="muted-copy">No reports are awaiting review.</p> : <ul className="safety-list moderator-list">{moderatorReports.map((item) => <li key={item.id}><div><strong>{item.targetType} · {item.reason}</strong><small>{item.description}</small><small>Reported by {item.reporter?.name || 'traveller'} · {item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</small><textarea aria-label="Private moderator notes" maxLength="2000" value={moderatorNotes[item.id] || ''} onChange={(event) => setModeratorNotes({ ...moderatorNotes, [item.id]: event.target.value })} placeholder="Private moderator notes" /></div><div className="safety-actions"><button type="button" onClick={() => moderate(item.id, 'UNDER_REVIEW')}>Review</button><button type="button" onClick={() => moderate(item.id, 'RESOLVED')}>Resolve</button><button type="button" onClick={() => moderate(item.id, 'DISMISSED')}>Dismiss</button></div></li>)}</ul>}
+          {reportTotalPages > 1 && <div className="safety-actions"><button type="button" disabled={reportPage <= 1} onClick={() => setReportPage((value) => value - 1)}>Previous reports</button><span>Page {reportPage} of {reportTotalPages}</span><button type="button" disabled={reportPage >= reportTotalPages} onClick={() => setReportPage((value) => value + 1)}>Next reports</button></div>}
         </section>}
 
         {moderatorAccess && <section className="safety-section">
           <h2>Content safety review</h2>
           <p className="safety-note">Classifier results are review signals, not findings of fact. Decisions are audited; account suspensions are not automated here.</p>
-          <label>Queue<select value={moderationFilter} onChange={(event) => setModerationFilter(event.target.value)}><option value="OPEN">Open items</option><option value="ALL">Open, in review, and escalated</option></select></label>
-          {!moderationItems.length ? <p className="muted-copy">No content safety items are awaiting review.</p> : <ul className="safety-list moderator-list">{moderationItems.map((item) => <li key={item.id}><div><strong>{item.targetType.replaceAll('_', ' ')} · {item.severity} · {Math.round(item.confidence * 100)}% confidence</strong><small>{item.categories.join(', ') || 'No categories'} · {item.reasonCodes.join(', ') || 'No rule codes'} · {item.provider}</small>{item.target?.text && <p>{item.target.text}</p>}{item.appealReason && <small>Appeal: {item.appealReason}</small>}<textarea aria-label="Moderation decision reason" maxLength="500" minLength="3" value={moderatorNotes[item.id] || ''} onChange={(event) => setModeratorNotes({ ...moderatorNotes, [item.id]: event.target.value })} placeholder="Reason required for this decision" /></div><div className="safety-actions"><button type="button" disabled={busy} onClick={() => decideModeration(item, 'ALLOW')}>Allow</button><button type="button" disabled={busy} onClick={() => decideModeration(item, 'FLAG')}>Dismiss flag</button>{['MESSAGE', 'REVIEW'].includes(item.targetType) && <button type="button" disabled={busy} onClick={() => decideModeration(item, 'HIDE')}>Hide</button>}{['MESSAGE', 'REVIEW'].includes(item.targetType) && <button type="button" disabled={busy} onClick={() => decideModeration(item, 'RESTORE')}>Restore</button>}<button type="button" disabled={busy} onClick={() => decideModeration(item, 'ESCALATE')}>Escalate</button></div></li>)}</ul>}
+          <div className="safety-form">
+            <label>Queue<select value={moderationFilter} onChange={(event) => { setModerationPage(1); setModerationFilter(event.target.value) }}><option value="OPEN">Open items</option><option value="IN_REVIEW">In review</option><option value="ESCALATED">Escalated</option><option value="ALL">All active items</option></select></label>
+            <label>Target type<select value={moderationType} onChange={(event) => { setModerationPage(1); setModerationType(event.target.value) }}><option value="">All types</option>{['MESSAGE', 'REVIEW', 'PROFILE', 'TRIP', 'REPORT', 'ASSISTANT_INPUT', 'ASSISTANT_OUTPUT'].map((type) => <option key={type}>{type}</option>)}</select></label>
+            <label>Severity<select value={moderationSeverity} onChange={(event) => { setModerationPage(1); setModerationSeverity(event.target.value) }}><option value="">All severities</option>{['NONE', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((severity) => <option key={severity}>{severity}</option>)}</select></label>
+            <label>Created from<input type="datetime-local" value={moderationFrom} onChange={(event) => setModerationFrom(event.target.value)} /></label>
+            <label>Created to<input type="datetime-local" value={moderationTo} onChange={(event) => setModerationTo(event.target.value)} /></label>
+          </div>
+          {!moderationItems.length ? <p className="muted-copy">No content safety items are awaiting review.</p> : <ul className="safety-list moderator-list">{moderationItems.map((item) => <li key={item.id}><div><strong>{item.targetType.replaceAll('_', ' ')} · {item.severity} · {Math.round(item.confidence * 100)}% confidence</strong><small>{item.categories.join(', ') || 'No categories'} · {item.reasonCodes.join(', ') || 'No rule codes'} · {item.provider}</small>{item.target?.text && <p>{item.target.text}</p>}{item.appealReason && <small>Appeal: {item.appealReason}</small>}<textarea aria-label="Moderation decision reason" maxLength="500" minLength="3" value={moderatorNotes[item.id] || ''} onChange={(event) => setModeratorNotes({ ...moderatorNotes, [item.id]: event.target.value })} placeholder="Reason required for this decision" /></div><div className="safety-actions"><button type="button" disabled={busy} onClick={() => decideModeration(item, 'ALLOW')}>Allow</button><button type="button" disabled={busy} onClick={() => decideModeration(item, 'FLAG')}>Dismiss flag</button>{['MESSAGE', 'REVIEW', 'TRIP'].includes(item.targetType) && <button type="button" disabled={busy} onClick={() => decideModeration(item, 'HIDE')}>Hide</button>}{['MESSAGE', 'REVIEW', 'TRIP'].includes(item.targetType) && <button type="button" disabled={busy} onClick={() => decideModeration(item, 'RESTORE')}>Restore</button>}<button type="button" disabled={busy} onClick={() => decideModeration(item, 'ESCALATE')}>Escalate</button></div></li>)}</ul>}
+          {moderationTotalPages > 1 && <div className="safety-actions"><button type="button" disabled={moderationPage <= 1} onClick={() => setModerationPage((value) => value - 1)}>Previous</button><span>Page {moderationPage} of {moderationTotalPages}</span><button type="button" disabled={moderationPage >= moderationTotalPages} onClick={() => setModerationPage((value) => value + 1)}>Next</button></div>}
+        </section>}
+
+        {moderatorAccess && <section className="safety-section">
+          <h2>Review reports</h2>
+          <p className="safety-note">This uses the existing review moderation and report resolution workflow.</p>
+          <label>Status<select value={reviewReportStatus} onChange={(event) => { setReviewReportPage(1); setReviewReportStatus(event.target.value) }}><option value="OPEN">Open</option><option value="RESOLVED">Resolved</option><option value="DISMISSED">Dismissed</option></select></label>
+          {!reviewReports.length ? <p className="muted-copy">No review reports match this filter.</p> : <ul className="safety-list moderator-list">{reviewReports.map((item) => <li key={item.id}><div><strong>{item.reason.replaceAll('_', ' ')} · {item.status}</strong><small>Reported by {item.reporter?.name || 'traveller'} · {item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</small>{item.review && <p><strong>{item.review.author?.name || 'Traveler'} on {item.review.trip?.title || 'trip'}: </strong>{item.review.comment || 'No written review.'}</p>}<textarea aria-label="Review report resolution" maxLength="1000" value={moderatorNotes[item.id] || ''} onChange={(event) => setModeratorNotes({ ...moderatorNotes, [item.id]: event.target.value })} placeholder="Resolution note" /></div><div className="safety-actions">{item.status === 'OPEN' && <><button type="button" disabled={busy} onClick={() => resolveReviewReport(item, 'RESOLVED')}>Resolve report</button><button type="button" disabled={busy} onClick={() => resolveReviewReport(item, 'DISMISSED')}>Dismiss report</button>{item.review?.status !== 'HIDDEN' ? <button type="button" disabled={busy} onClick={() => moderateReview(item.review, 'HIDDEN')}>Hide review</button> : <button type="button" disabled={busy} onClick={() => moderateReview(item.review, 'PUBLISHED')}>Restore review</button>}</>}</div></li>)}</ul>}
+          {reviewReportTotalPages > 1 && <div className="safety-actions"><button type="button" disabled={reviewReportPage <= 1} onClick={() => setReviewReportPage((value) => value - 1)}>Previous</button><span>Page {reviewReportPage} of {reviewReportTotalPages}</span><button type="button" disabled={reviewReportPage >= reviewReportTotalPages} onClick={() => setReviewReportPage((value) => value + 1)}>Next</button></div>}
         </section>}
 
         <section className="safety-section">

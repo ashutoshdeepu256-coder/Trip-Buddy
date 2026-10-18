@@ -6,13 +6,13 @@ const { getCookieOptions } = require("../middleware/auth");
 const register = async (req, res) => {
   const user = await authService.register(req.body);
   res.cookie("tripbuddy_session", authService.createSessionToken(user._id, user.tokenVersion), getCookieOptions());
-  return sendSuccess(res, { user: authService.publicUser(user) }, "Account created", 201);
+  return sendSuccess(res, { user: authService.sessionUser(user) }, "Account created", 201);
 };
 
 const login = async (req, res) => {
   const user = await authService.login(req.body);
   res.cookie("tripbuddy_session", authService.createSessionToken(user._id, user.tokenVersion), getCookieOptions());
-  return sendSuccess(res, { user: authService.publicUser(user) }, "Signed in");
+  return sendSuccess(res, { user: authService.sessionUser(user) }, "Signed in");
 };
 
 const logout = async (req, res) => {
@@ -26,7 +26,7 @@ const logout = async (req, res) => {
 };
 
 const currentUser = (req, res) =>
-  sendSuccess(res, { user: authService.publicUser(req.user) });
+  sendSuccess(res, { user: authService.sessionUser(req.user) });
 
 const resendEmailVerification = async (req, res) => {
   const result = await verificationService.sendEmailVerificationForUser(req.user);

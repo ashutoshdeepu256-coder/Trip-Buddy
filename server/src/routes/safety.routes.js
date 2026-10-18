@@ -22,10 +22,14 @@ const reportReviewSchema = require("zod").z.object({
   moderatorNotes: require("zod").z.string().trim().max(2000).optional().default(""),
 });
 const moderationQuerySchema = require("zod").z.object({
-  status: require("zod").z.enum(["OPEN", "ALL"]).default("OPEN"),
+  status: require("zod").z.enum(["OPEN", "IN_REVIEW", "ESCALATED", "ALL"]).default("OPEN"),
+  targetType: require("zod").z.enum(["MESSAGE", "REVIEW", "PROFILE", "TRIP", "REPORT", "ASSISTANT_INPUT", "ASSISTANT_OUTPUT"]).optional(),
+  severity: require("zod").z.enum(["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
+  createdFrom: require("zod").z.coerce.date().optional(),
+  createdTo: require("zod").z.coerce.date().optional(),
   page: require("zod").z.coerce.number().int().min(1).max(10000).default(1),
   limit: require("zod").z.coerce.number().int().min(1).max(50).default(20),
-}).strict();
+}).strict().refine((value) => !value.createdFrom || !value.createdTo || value.createdFrom <= value.createdTo, { message: "Invalid date range" });
 const moderationDecisionSchema = require("zod").z.object({
   action: require("zod").z.enum(["ALLOW", "FLAG", "HIDE", "RESTORE", "ESCALATE"]),
   reason: require("zod").z.string().trim().min(3).max(500),

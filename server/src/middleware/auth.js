@@ -30,6 +30,9 @@ const createAuthMiddleware = (projection) => async (req, _res, next) => {
     });
     const user = await User.findById(payload.sub).select(projection);
     if (!user) throw new HttpError(401, "Session is no longer valid", "UNAUTHENTICATED");
+    if (user.accountStatus && user.accountStatus !== "ACTIVE") {
+      throw new HttpError(403, "This account is restricted", "ACCOUNT_RESTRICTED");
+    }
     if ((payload.v || 0) !== (user.tokenVersion || 0)) {
       throw new HttpError(401, "Session is no longer valid", "UNAUTHENTICATED");
     }
@@ -50,4 +53,11 @@ const requireModerator = (req, _res, next) => {
   next();
 };
 
-module.exports = { requireAuth, requireMatchingAuth, requireModerator, getCookieOptions };
+const requireAdmin = (req, _res, next) => {
+  if (req.user?.role !== "ADMIN") {
+    return next(new HttpError(403, "Administrator access is required", "FORBIDDEN"));
+  }
+  next();
+};
+
+module.exports = { requireAuth, requireMatchingAuth, requireModerator, requireAdmin, getCookieOptions };

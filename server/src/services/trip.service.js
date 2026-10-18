@@ -172,6 +172,7 @@ const getAccessibleTrip = async (tripId, user = null) => {
   if (trip.status === "DRAFT" || trip.status === "CANCELLED") {
     throw new HttpError(404, "Trip was not found", "TRIP_NOT_FOUND");
   }
+  if (trip.moderationVisibility === "HIDDEN") throw new HttpError(404, "Trip was not found", "TRIP_NOT_FOUND");
   if (trip.privacy === "PUBLIC") return serializeTrip(trip);
   if (trip.privacy === "COMMUNITY" && user) return serializeTrip(trip);
   throw new HttpError(404, "Trip was not found", "TRIP_NOT_FOUND");

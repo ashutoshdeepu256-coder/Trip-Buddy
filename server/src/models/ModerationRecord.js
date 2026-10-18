@@ -23,6 +23,7 @@ const moderationRecordSchema = new mongoose.Schema({
 
 moderationRecordSchema.index({ targetType: 1, targetId: 1 }, { unique: true });
 moderationRecordSchema.index({ reviewStatus: 1, severity: -1, createdAt: 1 });
+moderationRecordSchema.index({ reviewStatus: 1, targetType: 1, severity: 1, createdAt: -1 });
 moderationRecordSchema.index({ targetType: 1, createdAt: -1 });
 
 module.exports = mongoose.models.ModerationRecord || mongoose.model("ModerationRecord", moderationRecordSchema);

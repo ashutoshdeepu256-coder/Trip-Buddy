@@ -183,8 +183,10 @@ const listMyReports = async (actor, { page, limit }) => {
   return { items: items.map((item) => ({ id: item._id.toString(), targetType: item.targetType, reason: item.reason, status: item.status === "OPEN" ? "SUBMITTED" : item.status, createdAt: item.createdAt, updatedAt: item.updatedAt, resolvedAt: item.resolvedAt })), page, limit, total, totalPages: Math.ceil(total / limit) };
 };
 
-const listReports = async ({ status, page, limit }) => {
+const listReports = async ({ status, page, limit, targetType, createdFrom, createdTo }) => {
   const query = status === "OPEN" ? { status: { $in: ["SUBMITTED", "OPEN"] } } : status ? { status } : {};
+  if (targetType) query.targetType = targetType;
+  if (createdFrom || createdTo) query.createdAt = { ...(createdFrom ? { $gte: createdFrom } : {}), ...(createdTo ? { $lte: createdTo } : {}) };
   const [reports, total] = await Promise.all([Report.find(query)
     .select("+resolution +moderatorNotes")
     .populate("reporter", "name")
