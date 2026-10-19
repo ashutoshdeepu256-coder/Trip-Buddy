@@ -68,7 +68,9 @@ public registration cannot set a role.
 with bcrypt; session cookies are HTTP-only, `SameSite=Lax`, and `Secure` in
 production. Logout increments a persisted token version to invalidate issued
 sessions. `GET/PATCH /users/me` manage a private profile; `GET /users/:userId`
-returns a public projection and factual verification/trip/review signals only.
+returns a public projection containing the traveler's name, bio, city, country,
+and factual verification/trip/review signals. Private travel preferences,
+availability, budget ranges, and excluded destinations are not included.
 
 Configure a unique random `JWT_SECRET` with at least 32 characters. Do not
 commit `.env` files. `CLIENT_URL` must name the single trusted browser origin.

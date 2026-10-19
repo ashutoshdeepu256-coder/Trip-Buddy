@@ -72,11 +72,11 @@ test("match endpoints validate bounded pagination and object identifiers", () =>
   assert.equal(matchIdParamsSchema.safeParse({ matchId: "not-an-id" }).success, false);
 });
 
-test("matching authentication projects only the requesting user's preferences and session version", async (context) => {
+test("matching authentication projects preferences, account status, and session version", async (context) => {
   const secret = "test-only-matching-secret-with-at-least-thirty-two-characters";
   process.env.JWT_SECRET = secret;
   let selectedFields;
-  const authenticatedUser = { _id: userId, tokenVersion: 0, profile: user.profile, updatedAt: user.updatedAt };
+  const authenticatedUser = { _id: userId, tokenVersion: 0, accountStatus: "ACTIVE", profile: user.profile, updatedAt: user.updatedAt };
   context.mock.method(User, "findById", () => ({
     select(fields) {
       selectedFields = fields;
@@ -92,10 +92,32 @@ test("matching authentication projects only the requesting user's preferences an
   const request = { headers: { authorization: `Bearer ${token}` }, cookies: {} };
   const error = await new Promise((resolve) => requireMatchingAuth(request, {}, resolve));
   assert.equal(error, undefined);
-  assert.equal(selectedFields, "_id profile.travelPreferences updatedAt +tokenVersion");
+  assert.equal(selectedFields, "_id profile.travelPreferences updatedAt accountStatus +tokenVersion");
   assert.equal("email" in request.user, false);
   assert.equal("phoneNumber" in request.user, false);
   assert.equal("role" in request.user, false);
+});
+
+test("matching authentication rejects a suspended account", async (context) => {
+  const secret = "test-only-suspended-match-secret-with-at-least-thirty-two-characters";
+  process.env.JWT_SECRET = secret;
+  context.mock.method(User, "findById", () => ({
+    select(fields) {
+      assert.match(fields, /(?:^|\s)accountStatus(?:\s|$)/);
+      return Promise.resolve({ _id: userId, tokenVersion: 0, accountStatus: "SUSPENDED" });
+    },
+  }));
+  const token = jwt.sign({ v: 0 }, secret, {
+    subject: userId.toString(),
+    issuer: "tripbuddy",
+    audience: "tripbuddy-web",
+    expiresIn: "1m",
+  });
+  const request = { headers: { authorization: `Bearer ${token}` }, cookies: {} };
+  const error = await new Promise((resolve) => requireMatchingAuth(request, {}, resolve));
+  assert.equal(error.statusCode, 403);
+  assert.equal(error.code, "ACCOUNT_RESTRICTED");
+  assert.equal(request.user, undefined);
 });
 
 test("compatibility cache is keyed by user and trip updates and refresh forces recalculation", async () => {

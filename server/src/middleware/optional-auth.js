@@ -16,8 +16,14 @@ const optionalAuth = async (req, _res, next) => {
       issuer: "tripbuddy",
       audience: "tripbuddy-web",
     });
-    const user = await User.findById(payload.sub).select("_id profile.travelPreferences updatedAt +tokenVersion");
-    if (user && (payload.v || 0) === (user.tokenVersion || 0)) req.user = user;
+    const user = await User.findById(payload.sub).select("_id profile.travelPreferences updatedAt accountStatus +tokenVersion");
+    if (
+      user &&
+      (!user.accountStatus || user.accountStatus === "ACTIVE") &&
+      (payload.v || 0) === (user.tokenVersion || 0)
+    ) {
+      req.user = user;
+    }
     next();
   } catch (error) {
     if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError" || error.name === "NotBeforeError") {

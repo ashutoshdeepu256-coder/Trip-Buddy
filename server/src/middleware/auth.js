@@ -44,7 +44,7 @@ const createAuthMiddleware = (projection) => async (req, _res, next) => {
 };
 
 const requireAuth = createAuthMiddleware("+role +phoneNumber +tokenVersion");
-const requireMatchingAuth = createAuthMiddleware("_id profile.travelPreferences updatedAt +tokenVersion");
+const requireMatchingAuth = createAuthMiddleware("_id profile.travelPreferences updatedAt accountStatus +tokenVersion");
 
 const requireModerator = (req, _res, next) => {
   if (!["ADMIN", "MODERATOR"].includes(req.user?.role)) {

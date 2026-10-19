@@ -312,6 +312,19 @@ for (const [method, path] of protectedRoutes) {
   });
 }
 
+test("cookie-authenticated mutations reject an untrusted Origin", async () => {
+  const response = await fetch(`${origin}/api/v1/auth/logout`, {
+    method: "POST",
+    headers: {
+      cookie: "tripbuddy_session=invalid-session",
+      origin: "https://attacker.example",
+    },
+  });
+  const payload = await response.json();
+  assert.equal(response.status, 403);
+  assert.equal(payload.error.code, "REQUEST_ORIGIN_DENIED");
+});
+
 test("trip detail rejects malformed ids before database access", async () => {
   const { response, payload } = await request("GET", "/api/v1/trips/not-an-id");
   assert.equal(response.status, 400);

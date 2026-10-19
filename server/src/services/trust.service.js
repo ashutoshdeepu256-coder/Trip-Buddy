@@ -24,12 +24,18 @@ const getTrustSignals = async (user) => {
 };
 
 const getPublicProfile = async (userId) => {
-  const user = await User.findById(userId);
+  const user = await User.findById(userId).select(
+    "name profile.bio profile.city profile.country verification.email.status verification.phone.status verification.identity.status createdAt",
+  );
   if (!user) return null;
   return {
     id: user._id.toString(),
     name: user.name,
-    profile: user.profile,
+    profile: {
+      bio: user.profile?.bio || "",
+      city: user.profile?.city || "",
+      country: user.profile?.country || "",
+    },
     trust: await getTrustSignals(user),
     createdAt: user.createdAt,
   };
