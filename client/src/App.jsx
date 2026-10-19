@@ -1,30 +1,30 @@
 import './App.css'
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { useAuthStore } from './store/authStore'
-import AuthPage from './pages/AuthPage'
-import ProfilePage from './pages/ProfilePage'
-import PublicProfilePage from './pages/PublicProfilePage'
-import EmailVerificationPage from './pages/EmailVerificationPage'
-import VerificationCenter from './pages/verification/VerificationCenter'
-import IdentityVerification from './pages/verification/IdentityVerification'
-import DestinationDiscovery from './pages/DestinationDiscovery'
-import DestinationPage from './pages/DestinationPage'
-import CreateTrip from './pages/trips/CreateTrip'
-import EditTrip from './pages/trips/EditTrip'
-import TripDetails from './pages/trips/TripDetails'
-import MyTrips from './pages/trips/MyTrips'
-import DiscoverTrips from './pages/trips/DiscoverTrips'
-import ConnectionsPage from './pages/connections/ConnectionsPage'
-import ChatPage from './pages/ChatPage'
-import ItineraryPlanner from './pages/ItineraryPlanner'
-import BookingsPage from './pages/BookingsPage'
-import TripExpenses from './pages/trips/TripExpenses'
-import PaymentsPage from './pages/PaymentsPage'
-import SafetyCenter from './pages/SafetyCenter'
-import NotificationsPage from './pages/NotificationsPage'
-import TravelAssistant from './pages/TravelAssistant'
-import AdminPanel from './pages/AdminPanel'
+const AuthPage = lazy(() => import('./pages/AuthPage'))
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage'))
+const EmailVerificationPage = lazy(() => import('./pages/EmailVerificationPage'))
+const VerificationCenter = lazy(() => import('./pages/verification/VerificationCenter'))
+const IdentityVerification = lazy(() => import('./pages/verification/IdentityVerification'))
+const DestinationDiscovery = lazy(() => import('./pages/DestinationDiscovery'))
+const DestinationPage = lazy(() => import('./pages/DestinationPage'))
+const CreateTrip = lazy(() => import('./pages/trips/CreateTrip'))
+const EditTrip = lazy(() => import('./pages/trips/EditTrip'))
+const TripDetails = lazy(() => import('./pages/trips/TripDetails'))
+const MyTrips = lazy(() => import('./pages/trips/MyTrips'))
+const DiscoverTrips = lazy(() => import('./pages/trips/DiscoverTrips'))
+const ConnectionsPage = lazy(() => import('./pages/connections/ConnectionsPage'))
+const ChatPage = lazy(() => import('./pages/ChatPage'))
+const ItineraryPlanner = lazy(() => import('./pages/ItineraryPlanner'))
+const BookingsPage = lazy(() => import('./pages/BookingsPage'))
+const TripExpenses = lazy(() => import('./pages/trips/TripExpenses'))
+const PaymentsPage = lazy(() => import('./pages/PaymentsPage'))
+const SafetyCenter = lazy(() => import('./pages/SafetyCenter'))
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'))
+const TravelAssistant = lazy(() => import('./pages/TravelAssistant'))
+const AdminPanel = lazy(() => import('./pages/AdminPanel'))
 import NotificationBell from './components/notifications/NotificationBell'
 import { useNotificationStore } from './store/notificationStore'
 
@@ -211,6 +211,7 @@ function App() {
   return (
     <>
     {user && <NotificationBell />}
+    <Suspense fallback={<div className="page-loading" role="status">Loading TripBuddy…</div>}>
     <Routes>
       <Route path="/" element={home} />
       <Route path="/login" element={<AuthPage mode="login" />} />
@@ -243,6 +244,7 @@ function App() {
       <Route path="/bookings" element={<ProtectedRoute><BookingsPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
     </>
   )
 }

@@ -85,7 +85,11 @@ for Phase 9 discovery; user profile language fields do not currently exist.
 - `popularity`: most active members first, a factual count rather than a
   synthetic score.
 - `compatibility`: reserved for Phase 10; returns
-  `COMPATIBILITY_SORT_UNAVAILABLE` (501) until that engine exists.
+  a compatibility-ranked list for signed-in users. The service scores at most
+  500 eligible candidates and reports `truncated` when more candidates were
+  available. Anonymous requests receive `UNAUTHENTICATED` (401). The current
+  implementation filters blocks before returning results and uses creation
+  time and ID as stable tie breakers.
 
 `data` contains `items`, `page`, `limit`, `total`, `totalPages`,
 `hasNextPage`, and `hasPreviousPage`. Each card contains a restricted trip
@@ -97,11 +101,14 @@ and never returns Cloudinary provider IDs.
 
 ## Indexes and operational choices
 
-Discovery uses one aggregation pipeline with bounded `$lookup` stages for
-published destinations, projected creator fields, and ACTIVE member counts;
-it avoids per-result queries. `$facet` produces records and total count from
+Discovery uses one aggregation pipeline with `$lookup` stages for published
+destinations, projected creator fields, and ACTIVE member counts; it avoids
+per-result application queries. `$facet` produces records and total count from
 the same filtered result set. Requests are not cached because membership
-counts and visibility can change frequently.
+counts and visibility can change frequently. The pipeline has not been
+validated with production query plans: no isolated MongoDB test URI was
+available during Phase 27. Index changes are therefore deferred until
+`explain("executionStats")` evidence is available for representative data.
 
 Trip query indexes include:
 
