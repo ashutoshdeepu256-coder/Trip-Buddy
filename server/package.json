@@ -8,6 +8,8 @@
     "start": "node server.js",
     "lint": "eslint .",
     "test": "node --test",
+    "test:integration": "node scripts/run-integration-tests.js",
+    "test:coverage": "node --experimental-test-coverage --test --test-coverage-include=src/**/*.js",
     "seed:destinations": "node scripts/seed-destinations.js"
   },
   "keywords": [],
