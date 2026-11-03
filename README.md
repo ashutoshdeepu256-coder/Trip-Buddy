@@ -16,7 +16,7 @@ Built using the **MERN Stack**, TripBuddy combines modern web technologies, inte
 - [Key Features](#-key-features)
 - [System Architecture](#-system-architecture)
 - [Technology Stack](#-technology-stack)
-- [Smart Matching Algorithm](#-smart-traveller-matching-algorithm)
+- [Smart Traveller Matching](#-smart-traveller-matching-algorithm)
 - [Project Structure](#-project-structure)
 - [Getting Started](#-getting-started)
 - [Environment Variables](#-environment-variables)
@@ -51,14 +51,16 @@ To build a trusted travel community where discovering places and finding the rig
 ## ✨ Key Features
 
 ### 👤 1. Authentication & User Identity
+
 - User registration and login.
 - JWT-based authentication.
 - Protected routes and user sessions.
 - Secure password handling.
-- Verification foundations.
+- User verification foundations.
 - Public and private user profiles.
 
 ### 🧑‍🤝‍🧑 2. Traveller Profiles & Travel Identity
+
 - Customizable traveller profiles.
 - Profile pictures and cover images.
 - Personal bio and location.
@@ -69,28 +71,28 @@ To build a trusted travel community where discovering places and finding the rig
 - Dynamic profile completeness tracking.
 
 ### 🗺️ 3. Destination Discovery
+
 - Explore travel destinations.
 - Destination-based search and filtering.
-- Discover places based on interests.
+- Discover places based on travel interests.
 - Budget-oriented destination discovery.
-- Destination categorization and information.
+- Destination information and categorization.
 
 ### ✈️ 4. Trip Creation & Management
+
 - Create and manage travel plans.
 - Save trips as drafts.
 - Publish trips for other travellers.
 - Update trip information.
 - Manage trip visibility and lifecycle.
 - Upload trip images.
-- Explore trips created by other users.
+- Discover trips created by other users.
 
 ### 🔍 5. Smart Traveller Matching
 
 TripBuddy uses a deterministic, preference-based compatibility engine to identify travellers and trips that align with each other's preferences.
 
-Matching parameters:
-
-| Parameter | Weight |
+| Matching Parameter | Weight |
 |---|---:|
 | Destination compatibility | 25% |
 | Travel date compatibility | 20% |
@@ -101,7 +103,8 @@ Matching parameters:
 | Group size | 5% |
 | Other preferences | 5% |
 
-Matching techniques:
+**Matching techniques:**
+
 - Jaccard similarity for preference comparison.
 - Budget range overlap.
 - Travel date compatibility.
@@ -112,6 +115,7 @@ Matching techniques:
 *Compatibility scores represent preference similarity, not a guaranteed prediction of travel success.*
 
 ### 💬 6. Real-Time Communication Architecture
+
 - Socket.IO-based communication architecture.
 - Authenticated socket connections.
 - Conversation authorization.
@@ -119,6 +123,7 @@ Matching techniques:
 - REST API and real-time event integration.
 
 ### 🛡️ 7. Trust, Safety & Security
+
 - Protected API endpoints.
 - Role-based authorization foundations.
 - User blocking and reporting workflows.
@@ -133,9 +138,11 @@ Matching techniques:
 
 TripBuddy follows a modular client-server architecture that separates the frontend, backend business logic, real-time communication and data storage.
 
-### Interactive Architecture Diagram
+### Interactive System Architecture Diagram
 
-The following Mermaid diagram is rendered directly by GitHub. You can inspect the different system layers and their connections.
+The following diagram uses **Mermaid**, which GitHub automatically renders into a visual architecture diagram.
+
+It illustrates the major application layers, their components and the communication between them.
 
 ```mermaid
 flowchart TB
@@ -146,6 +153,7 @@ flowchart TB
         ROUTER["React Router"]
         STATE["Zustand State Management"]
         AXIOS["Axios API Client"]
+
         UI --> ROUTER
         ROUTER --> STATE
         STATE --> AXIOS
@@ -154,7 +162,7 @@ flowchart TB
     subgraph BACKEND["⚙️ BACKEND — Node.js + Express"]
         API["REST API Layer"]
         MW["Middleware<br/>JWT · RBAC · Zod · Rate Limiting"]
-        
+
         subgraph SERVICES["Business Logic / Services"]
             AUTH["Authentication Service"]
             USER["User & Profile Service"]
@@ -175,16 +183,18 @@ flowchart TB
         MW --> MATCH
         MW --> CHAT
         MW --> SAFETY
+
         CHAT <--> SOCKET
     end
 
-    subgraph DATA["💾 DATA & STORAGE LAYER"]
+    subgraph STORAGE["💾 DATA & STORAGE LAYER"]
         DB[("MongoDB Atlas<br/>Users · Trips · Destinations<br/>Messages · Connections")]
-        REDIS[("Redis<br/>Caching · Sessions · Scaling")]
+        REDIS[("Redis<br/>Caching · Real-time Scaling")]
         CLOUD["Cloudinary<br/>Images & Media"]
     end
 
     U --> UI
+
     AXIOS <-->|"HTTPS / JSON"| API
     STATE <-->|"WebSocket Events"| SOCKET
 
@@ -204,11 +214,40 @@ flowchart TB
 
     classDef frontend fill:#dbeafe,stroke:#2563eb,color:#172554
     classDef backend fill:#ede9fe,stroke:#7c3aed,color:#312e81
-    classDef database fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef storage fill:#dcfce7,stroke:#16a34a,color:#14532d
 
     class UI,ROUTER,STATE,AXIOS frontend
     class API,MW,AUTH,USER,DEST,TRIP,MATCH,CHAT,SAFETY,SOCKET backend
-    class DB,REDIS,CLOUD database
+    class DB,REDIS,CLOUD storage
+```
+
+### 🔄 Application Data Flow
+
+```mermaid
+flowchart TD
+    A["User Opens TripBuddy"] --> B["React Frontend"]
+    B --> C{"Request Type"}
+
+    C -->|"Regular API Request"| D["Axios HTTP Request"]
+    C -->|"Real-time Interaction"| E["Socket.IO Connection"]
+
+    D --> F["Express API"]
+    F --> G["Authentication & Validation"]
+    G --> H["Business Logic Services"]
+
+    H --> I[("MongoDB Atlas")]
+    H --> J[("Redis Cache")]
+    H --> K["Cloudinary"]
+
+    I --> L["API Response"]
+    J --> L
+    K --> L
+
+    L --> M["Update Frontend State"]
+
+    E --> N["Socket Authentication"]
+    N --> O["Authorized Real-time Events"]
+    O --> P["Update Connected Clients"]
 ```
 
 ### Architecture Layers Explained
@@ -225,13 +264,14 @@ flowchart TB
 | Cache Layer | Shared caching and real-time scaling support |
 | Media Layer | Image and file storage using Cloudinary |
 
-*Redis is shown as a production architecture component; configure it only when the corresponding application functionality is implemented.*
+*Architecture diagrams illustrate the intended system design. Redis, distributed scaling and individual integrations should be enabled only when configured in the deployed application.*
 
 ---
 
 ## 🛠️ Technology Stack
 
 ### Frontend
+
 | Technology | Purpose |
 |---|---|
 | React.js | User interface |
@@ -245,6 +285,7 @@ flowchart TB
 | Lucide React | Icons |
 
 ### Backend
+
 | Technology | Purpose |
 |---|---|
 | Node.js | JavaScript runtime |
@@ -257,6 +298,7 @@ flowchart TB
 | Zod | Request validation |
 
 ### Storage & Infrastructure
+
 | Technology | Purpose |
 |---|---|
 | MongoDB Atlas | Cloud database |
@@ -293,16 +335,16 @@ flowchart TD
 
 ### Scoring Dimensions
 
-- Destination compatibility: 25%
-- Travel dates: 20%
-- Budget: 15%
-- Interests: 15%
-- Travel style: 10%
-- Activities: 5%
-- Group size: 5%
-- Other preferences: 5%
+- Destination compatibility: 25%.
+- Travel date compatibility: 20%.
+- Budget compatibility: 15%.
+- Shared interests: 15%.
+- Travel style: 10%.
+- Preferred activities: 5%.
+- Group size: 5%.
+- Other preferences: 5%.
 
-The resulting compatibility score helps travellers identify trips and people that align with their expectations.
+The resulting compatibility score helps travellers discover trips and people that align with their expectations.
 
 ---
 
@@ -316,8 +358,7 @@ Trip-Buddy/
 │   └── src/
 │       ├── assets/
 │       ├── components/
-│       │   ├── profile/
-│       │   └── ...
+│       │   └── profile/
 │       ├── hooks/
 │       ├── pages/
 │       │   └── profile/
@@ -345,6 +386,7 @@ Trip-Buddy/
 │   └── deployment/
 │
 ├── package.json
+├── package-lock.json
 └── README.md
 ```
 
@@ -360,11 +402,11 @@ Follow these instructions to run TripBuddy locally.
 
 Install the following:
 
-- Node.js (LTS recommended)
-- npm
-- Git
-- MongoDB Atlas account or local MongoDB
-- Cloudinary account for media uploads
+- Node.js (LTS recommended).
+- npm.
+- Git.
+- MongoDB Atlas account or local MongoDB.
+- Cloudinary account for media uploads.
 
 ### 1. Clone the Repository
 
@@ -398,7 +440,7 @@ Backend:
 
 ### 5. Start the Frontend
 
-Open a separate terminal:
+Open another terminal:
 
 ```bash
 npm run dev --workspace=client
@@ -442,6 +484,7 @@ VITE_API_URL=http://localhost:5000/api/v1
 ```
 
 **Important:**
+
 - Use strong, unique secrets.
 - Never commit `.env` files.
 - Never expose backend secrets through frontend variables.
@@ -454,7 +497,7 @@ VITE_API_URL=http://localhost:5000/api/v1
 
 TripBuddy uses REST APIs for application operations.
 
-The following table describes the documented API areas.
+The following table describes documented API areas.
 
 | Module | Example Endpoint | Method |
 |---|---|---|
@@ -469,7 +512,7 @@ The following table describes the documented API areas.
 
 Additional API modules include authentication, destinations, trips, discovery, matching, chat and safety.
 
-For complete request/response specifications, see:
+For complete request and response specifications, see:
 
 `docs/api/`
 
@@ -595,7 +638,7 @@ Please follow the project's coding conventions and include appropriate tests for
 Full Stack Developer | MERN Stack | Software Development
 
 - GitHub: [@ashutoshdeepu256-coder](https://github.com/ashutoshdeepu256-coder)
-- Project: [TripBuddy Repository](https://github.com/ashutoshdeepu256-coder/Trip-Buddy)
+- Project Repository: [TripBuddy](https://github.com/ashutoshdeepu256-coder/Trip-Buddy)
 
 ---
 
@@ -607,6 +650,10 @@ Your feedback, suggestions and contributions are always welcome!
 
 ---
 
+<div align="center">
+
 ### 🌍 TripBuddy
 
 **Because every great journey deserves great companions.** ✈️
+
+</div>
